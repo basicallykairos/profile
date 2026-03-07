@@ -1984,16 +1984,8 @@ initVisitor();
   // Autoplay — browsers require a user gesture or muted to autoplay.
   // Try unmuted first; if blocked, play muted then restore volume on first interaction.
   aud.play().then(()=>setP(true)).catch(()=>{
-    aud.muted=true;
-    aud.play().then(()=>{
-      setP(true);
-      const unmute=()=>{ aud.muted=false; document.removeEventListener('click',unmute); document.removeEventListener('touchstart',unmute); };
-      document.addEventListener('click',unmute);
-      document.addEventListener('touchstart',unmute);
-    }).catch(()=>{
-      // Full autoplay blocked — show popup pointing to player
-      showMusicPopup();
-    });
+    // Blocked — leave player stopped, show popup
+    showMusicPopup();
   });
 
   function showMusicPopup(){
