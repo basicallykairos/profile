@@ -351,7 +351,9 @@ function renderDiscord(data){
     const badgeHtml=renderBadgeIcons(u.public_flags);
     if(badgeHtml) html+=`<div class="dc-badges">${badgeHtml}</div>`;
 
-    html+=`<div class="dc-divider"></div><div class="dc-section">Sobre mim</div><div class="dc-about">${h(bio||ABOUT)}</div>`;
+    // Preserve Discord line breaks and blank lines
+    function bioHtml(s){ return h(s).replace(/\n/g,'<br>'); }
+    html+=`<div class="dc-divider"></div><div class="dc-section">Sobre mim</div><div class="dc-about">${bioHtml(bio||ABOUT)}</div>`;
 
     if(sp){
         const elapsed=Date.now()-sp.timestamps.start, total=sp.timestamps.end-sp.timestamps.start;
@@ -1790,7 +1792,54 @@ initVisitor();
   .mp-vdot{position:absolute;top:50%;width:10px;height:10px;border-radius:50%;background:#b8a8f0;
     transform:translate(-50%,-50%) scale(0);transition:transform .15s;pointer-events:none;}
   .mp-vrail:hover .mp-vdot,.mp-vrail.drag .mp-vdot{transform:translate(-50%,-50%) scale(1);}
+
+  /* ── MUSIC POPUP ── */
+  #mp-popup {
+    position: fixed;
+    bottom: 90px; right: 22px;
+    background: #1e1c2e;
+    border: 1px solid rgba(180,160,255,.3);
+    border-radius: 12px;
+    padding: 10px 14px 10px 12px;
+    display: flex; align-items: center; gap: 9px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: #ccc;
+    box-shadow: 0 8px 32px rgba(0,0,0,.6), 0 0 0 1px rgba(180,160,255,.08);
+    cursor: pointer; z-index: 10000;
+    opacity: 0; transform: translateY(8px) scale(.95);
+    pointer-events: none;
+    transition: opacity .4s cubic-bezier(.16,1,.3,1), transform .4s cubic-bezier(.16,1,.3,1);
+  }
+  #mp-popup.visible {
+    opacity: 1; transform: translateY(0) scale(1);
+    pointer-events: auto;
+    animation: mp-pop-out 0s 2.8s forwards;
+  }
+  @keyframes mp-pop-out { to { opacity:0; transform:translateY(8px) scale(.95); pointer-events:none; } }
+  #mp-popup::after {
+    content: '';
+    position: absolute; bottom: -6px; right: 22px;
+    width: 10px; height: 10px;
+    background: #1e1c2e;
+    border-right: 1px solid rgba(180,160,255,.3);
+    border-bottom: 1px solid rgba(180,160,255,.3);
+    transform: rotate(45deg);
+  }
+  #mp-popup svg { flex-shrink: 0; }
+  #mp-popup span { white-space: nowrap; }
+  #mp-popup strong { color: #b8a8f0; }
 </style>
+
+<!-- Music popup hint -->
+<div id="mp-popup">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+       stroke="#b8a8f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18V5l12-2v13"/>
+    <circle cx="6" cy="18" r="3"/>
+    <circle cx="18" cy="16" r="3"/>
+  </svg>
+  <span>Clique aqui para <strong>tocar a música</strong></span>
+</div>
 
 <!-- Bubble -->
 <div id="mp-bubble">
@@ -1931,6 +1980,35 @@ initVisitor();
   bu.addEventListener('click',()=>{bu.style.display='none';pl.style.display='block';pl.style.animation='none';requestAnimationFrame(()=>{pl.style.animation='';});});
 
   aud.volume=0.8;
+
+  // Autoplay — browsers require a user gesture or muted to autoplay.
+  // Try unmuted first; if blocked, play muted then restore volume on first interaction.
+  aud.play().then(()=>setP(true)).catch(()=>{
+    aud.muted=true;
+    aud.play().then(()=>{
+      setP(true);
+      const unmute=()=>{ aud.muted=false; document.removeEventListener('click',unmute); document.removeEventListener('touchstart',unmute); };
+      document.addEventListener('click',unmute);
+      document.addEventListener('touchstart',unmute);
+    }).catch(()=>{
+      // Full autoplay blocked — show popup pointing to player
+      showMusicPopup();
+    });
+  });
+
+  function showMusicPopup(){
+    const pop=document.getElementById('mp-popup');
+    if(!pop) return;
+    // Small delay so page finishes loading visually
+    setTimeout(()=>{
+      pop.classList.add('visible');
+      setTimeout(()=>{ pop.classList.remove('visible'); }, 2800);
+    }, 900);
+    pop.addEventListener('click',()=>{
+      pop.classList.remove('visible');
+      aud.play().then(()=>setP(true)).catch(()=>{});
+    });
+  }
 })();
 </script>
 </body>
