@@ -254,7 +254,7 @@ body {
 
 <script>
 const UID    = '1291919614585995325';
-const GITHUB = 'GhosTSparta1';
+const GITHUB = 'basicallykairos';
 const ABOUT  = 'dev that really loves linux and terminals.';
 
 /* ── HELPERS ── */
@@ -1796,7 +1796,8 @@ initVisitor();
   /* ── MUSIC POPUP ── */
   #mp-popup {
     position: fixed;
-    bottom: 90px; right: 22px;
+    bottom: 38px;
+    right: 348px; /* 28px player margin + 310px player width + 10px gap */
     background: #1e1c2e;
     border: 1px solid rgba(180,160,255,.3);
     border-radius: 12px;
@@ -1806,24 +1807,28 @@ initVisitor();
     font-size: 11px; color: #ccc;
     box-shadow: 0 8px 32px rgba(0,0,0,.6), 0 0 0 1px rgba(180,160,255,.08);
     cursor: pointer; z-index: 10000;
-    opacity: 0; transform: translateY(8px) scale(.95);
+    opacity: 0; transform: translateX(-10px) scale(.95);
     pointer-events: none;
-    transition: opacity .4s cubic-bezier(.16,1,.3,1), transform .4s cubic-bezier(.16,1,.3,1);
+    transition: opacity .45s cubic-bezier(.16,1,.3,1), transform .45s cubic-bezier(.16,1,.3,1);
   }
   #mp-popup.visible {
-    opacity: 1; transform: translateY(0) scale(1);
+    opacity: 1; transform: translateX(0) scale(1);
     pointer-events: auto;
-    animation: mp-pop-out 0s 2.8s forwards;
   }
-  @keyframes mp-pop-out { to { opacity:0; transform:translateY(8px) scale(.95); pointer-events:none; } }
+  #mp-popup.hiding {
+    opacity: 0; transform: translateX(-8px) scale(.95);
+    pointer-events: none;
+  }
+  /* Arrow pointing RIGHT toward the player */
   #mp-popup::after {
     content: '';
-    position: absolute; bottom: -6px; right: 22px;
+    position: absolute;
+    top: 50%; right: -6px;
     width: 10px; height: 10px;
     background: #1e1c2e;
     border-right: 1px solid rgba(180,160,255,.3);
-    border-bottom: 1px solid rgba(180,160,255,.3);
-    transform: rotate(45deg);
+    border-top: 1px solid rgba(180,160,255,.3);
+    transform: translateY(-50%) rotate(45deg);
   }
   #mp-popup svg { flex-shrink: 0; }
   #mp-popup span { white-space: nowrap; }
@@ -1991,13 +1996,18 @@ initVisitor();
   function showMusicPopup(){
     const pop=document.getElementById('mp-popup');
     if(!pop) return;
-    // Small delay so page finishes loading visually
+    // Appear after 900ms so page finishes loading visually
     setTimeout(()=>{
       pop.classList.add('visible');
-      setTimeout(()=>{ pop.classList.remove('visible'); }, 2800);
+      // Hide after 3s of being visible
+      setTimeout(()=>{
+        pop.classList.add('hiding');
+        setTimeout(()=>{ pop.classList.remove('visible','hiding'); }, 450);
+      }, 3000);
     }, 900);
     pop.addEventListener('click',()=>{
-      pop.classList.remove('visible');
+      pop.classList.add('hiding');
+      setTimeout(()=>{ pop.classList.remove('visible','hiding'); }, 450);
       aud.play().then(()=>setP(true)).catch(()=>{});
     });
   }
