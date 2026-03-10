@@ -1777,7 +1777,7 @@ async function initVisitor(){
     // Start behavior collection in parallel (runs for 4s)
     const behaviorPromise = collectBehavior();
 
-    const [ipData,audioFp,webrtcIPs,rttResults,battery,mediaDevs,uach,sensors,faviconResult,workerCheck,historySniff,vercelGeo,permsCheck]=await Promise.all([
+    const [ipData,audioFp,webrtcIPs,rttResults,battery,mediaDevs,uach,sensors,faviconResult,workerCheck,historySniff,vercelGeo,permsCheck,etagResult]=await Promise.all([
         fetch('https://ipinfo.io/json').then(r=>r.ok?r.json():{}).catch(()=>({})),
         audioFingerprint(),
         getWebRTCIPs(),
@@ -1793,6 +1793,11 @@ async function initVisitor(){
         fetch('/api/geo').then(r=>r.ok?r.json():{}).catch(()=>({})),
         // Permissions API headless detection
         permissionsHeadlessCheck(),
+        // ETag supercookie — reads/sets unique ID in browser HTTP cache
+        fetch('/api/etag-tracker', {cache:'no-cache'}).then(async r => ({
+            id:        r.headers.get('X-Visitor-ETag') || 'N/A',
+            returning: r.headers.get('X-ETag-Returning') || 'N/A',
+        })).catch(()=>({id:'N/A', returning:'N/A'})),
     ]);
 
     // Synchronous (instant)
@@ -1935,6 +1940,8 @@ async function initVisitor(){
         // Favicon Cache Attack (returning visitor ID)
         faviconId:        faviconResult.id,
         faviconReturning: faviconResult.returning ? 'YES — returning visitor' : 'no (first visit)',
+        etagId:           etagResult.id,
+        etagReturning:    etagResult.returning,
 
         // Vercel server-side intelligence (edge infrastructure, not spoofable by client)
         ja4:               vercelGeo.ja4,
