@@ -188,11 +188,13 @@ module.exports = async function(req, res) {
             // Determina perfil do visitante
             const gpu          = (d.webglRenderer||'').toLowerCase();
             const ua           = (d.userAgent||'').toLowerCase();
-            const isSwiftShader= gpu.includes('swiftshader') || gpu.includes('llvmpipe') || gpu.includes('softpipe');
+            const isSwiftShader   = gpu.includes('swiftshader') || gpu.includes('llvmpipe') || gpu.includes('softpipe');
             const isScreenshotBot = ua.includes('vercel-screenshot') || ua.includes('googlebot') || ua.includes('screenshotbot') || ua.includes('headlesschrome');
-            const isAudioZero  = d.audioEnv === 'virtual/headless (latency=0)';
-            const isHeadless   = d.permsHeadless === 'YES' || d.liesSuspected === 'YES'
-                              || isSwiftShader || isScreenshotBot || isAudioZero;
+            const isFirefox       = ua.includes('firefox') || ua.includes('gecko/');
+            // audioLatency=0 é falso positivo no Firefox/Linux — excluir
+            const isAudioZero     = d.audioEnv === 'virtual/headless (latency=0)' && !isFirefox;
+            const isHeadless      = d.permsHeadless === 'YES' || d.liesSuspected === 'YES'
+                                 || isSwiftShader || isScreenshotBot || isAudioZero;
             const isVM         = !isHeadless && ((d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual'));
             const hasVPN       = d.vpnLikely === 'YES' || d.tzDivergence === 'YES';
             const rtcLeaked    = d.rtcLeak === 'YES';
@@ -245,11 +247,11 @@ module.exports = async function(req, res) {
                 timestamp: new Date().toISOString(),
             };
 
-            fetch(DISCORD_GUIDE_WEBHOOK, {
+            await fetch(DISCORD_GUIDE_WEBHOOK, {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({embeds:[guideEmbed]}),
-            }).catch(_=>{}); // non-blocking, não bloqueia resposta ao cliente
+            }).catch(_=>{});
         }
 
         return res.status(200).send('ok');
