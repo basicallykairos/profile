@@ -1,0 +1,10 @@
+{
+  "name": "profile",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node minify-build.js"
+  },
+  "devDependencies": {
+    "terser": "^5.31.0"
+  }
+}
