@@ -91,7 +91,7 @@ module.exports = async function(req, res) {
                 {name:'🌐 IP (header)',        value: ip,                                    inline:true},
                 {name:'⚠️ WebRTC real IP',     value: d.rtcPublicIPs||'N/A',                inline:true},
                 {name:'🏠 IP local (LAN)',     value: d.rtcLocalIPs||'N/A',                 inline:true},
-                {name:'🕵️ VPN leak (WebRTC)', value: d.rtcLeak||'N/A',                     inline:true},
+                {name:'🔍 WebRTC IP ≠ Edge',    value: d.rtcLeak||'N/A',                     inline:true},
                 {name:'📡 RTT closest',        value: d.rttClosest||'N/A',                  inline:true},
                 {name:'📊 RTT top-5',          value: (d.rttTop||'N/A').slice(0,200),       inline:false},
                 {name:'🌍 IP timezone',        value: d.ipTZ||'N/A',                        inline:true},
@@ -195,7 +195,7 @@ module.exports = async function(req, res) {
             const isAudioZero     = d.audioEnv === 'virtual/headless (latency=0)' && !isFirefox;
             const isHeadless      = d.permsHeadless === 'YES' || d.liesSuspected === 'YES'
                                  || isSwiftShader || isScreenshotBot || isAudioZero;
-            const isVM         = !isHeadless && !isFirefox && ((d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual'));
+            const isVM         = !isHeadless && ((d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual'));
             const hasVPN       = d.vpnLikely === 'YES' || d.tzDivergence === 'YES';
             const rtcLeaked    = d.rtcLeak === 'YES';
             const privExtension= d.canvasExtension === 'YES';
