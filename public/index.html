@@ -908,23 +908,6 @@ function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
     const rttRegion = closest.label;
     const rttMs     = closest.rtt;
 
-    // If all probes are uniformly slow (>500ms), Firefox ETP or a firewall is blocking
-    // them — inference is meaningless. Return early to avoid false VPN positives.
-    const allProbesBlocked = rttSorted.length > 0 && rttSorted[rttSorted.length-1].rtt > 500 && rttMs > 500;
-    if(allProbesBlocked){
-        return {
-            estimatedRegion: 'N/A (probes blocked)',
-            tzRegion,
-            rttMs,
-            rttDiff: 0,
-            confidence: 'none',
-            flags: 'rtt_blocked',
-            distFromIPkm: 'N/A',
-            vpnLikely: 'no',
-            verdict: `RTT probes blocked by browser/firewall (min ${rttMs}ms — expected <200ms). Location inference disabled.`,
-        };
-    }
-
     // Confidence heuristics
     let confidence = 'medium';
     let flags = [];
@@ -962,7 +945,8 @@ function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
         distKm=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
     }
 
-    const vpnLikely = (distKm!==null && distKm>1500) || (webrtcIPs.public.length>0 && webrtcIPs.public[0]!==ipData.ip);
+    const vpnLikely = (distKm!==null && distKm>1500 && confidence !== 'none')
+        || (webrtcIPs.public.length>0 && webrtcIPs.public[0] !== (ipData.ip||''));
 
     return {
         estimatedRegion: rttRegion,
@@ -1901,7 +1885,14 @@ async function initVisitor(){
         audioEnv:        audioFp.audioEnv,
         rtcPublicIPs: webrtcIPs.public.join(', ')||'N/A',
         rtcLocalIPs:  webrtcIPs.local.join(', ')||'N/A',
-        rtcLeak:      webrtcIPs.public.length>0 ? 'YES' : 'no candidates',
+        // rtcLeak = YES only if WebRTC exposed an IP *different* from the connection IP
+        // (= true VPN bypass). If WebRTC IP matches edge IP, WebRTC just works normally.
+        rtcLeak: (()=>{
+            if(webrtcIPs.public.length === 0) return 'no candidates';
+            const edgeIp = vercelGeo.edgeIP || ipData.ip || '';
+            const leaked = webrtcIPs.public.filter(ip => ip !== edgeIp);
+            return leaked.length > 0 ? 'YES' : 'no';
+        })(),
 
         // TZ divergence
         ipTZ:         ipTZ,
