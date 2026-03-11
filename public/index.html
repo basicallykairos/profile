@@ -908,6 +908,23 @@ function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
     const rttRegion = closest.label;
     const rttMs     = closest.rtt;
 
+    // If all probes are uniformly slow (>500ms), Firefox ETP or a firewall is blocking
+    // them — inference is meaningless. Return early to avoid false VPN positives.
+    const allProbesBlocked = rttSorted.length > 0 && rttSorted[rttSorted.length-1].rtt > 500 && rttMs > 500;
+    if(allProbesBlocked){
+        return {
+            estimatedRegion: 'N/A (probes blocked)',
+            tzRegion,
+            rttMs,
+            rttDiff: 0,
+            confidence: 'none',
+            flags: 'rtt_blocked',
+            distFromIPkm: 'N/A',
+            vpnLikely: 'no',
+            verdict: `RTT probes blocked by browser/firewall (min ${rttMs}ms — expected <200ms). Location inference disabled.`,
+        };
+    }
+
     // Confidence heuristics
     let confidence = 'medium';
     let flags = [];
