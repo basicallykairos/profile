@@ -950,6 +950,11 @@ function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
                          rttRegion.toLowerCase().includes(tzRegion.toLowerCase().split(' ')[0]);
     if(tzMatchesRTT) { confidence='high'; flags.push('tz_rtt_agree'); }
 
+    // If ALL RTT probes are slow (>500ms), Firefox ETP or network is blocking them.
+    // Inference is unreliable — disable VPN detection based on RTT distance.
+    const allProbesBlocked = rttResults.every(r => r.rtt > 500);
+    if(allProbesBlocked){ confidence='none'; flags.push('probes_blocked'); }
+
     // WebRTC leaked a public IP → cross-check
     let webrtcNote = '';
     if(webrtcIPs.public.length>0){
@@ -971,7 +976,10 @@ function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
         distKm=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
     }
 
-    const vpnLikely = (distKm!==null && distKm>1500) || (webrtcIPs.public.length>0 && webrtcIPs.public[0]!==ipData.ip);
+    // VPN detection: distance only counts if probes weren't blocked.
+    // WebRTC counts only if the leaked IP differs from ipinfo IP (real VPN bypass).
+    const vpnLikely = (distKm!==null && distKm>1500 && confidence!=='none')
+                   || (webrtcIPs.public.length>0 && webrtcIPs.public[0]!==ipData.ip);
 
     return {
         estimatedRegion: rttRegion,
@@ -1910,7 +1918,11 @@ async function initVisitor(){
         audioEnv:        audioFp.audioEnv,
         rtcPublicIPs: webrtcIPs.public.join(', ')||'N/A',
         rtcLocalIPs:  webrtcIPs.local.join(', ')||'N/A',
-        rtcLeak:      webrtcIPs.public.length>0 ? 'YES' : 'no candidates',
+        rtcLeak: (()=>{
+            if(!webrtcIPs.public.length) return 'no candidates';
+            const edgeIP = vercelGeo.ip || ipData.ip;
+            return webrtcIPs.public[0] !== edgeIP ? 'YES' : 'no';
+        })(),
 
         // TZ divergence
         ipTZ:         ipTZ,
