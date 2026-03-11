@@ -1777,7 +1777,7 @@ async function initVisitor(){
     // Start behavior collection in parallel (runs for 4s)
     const behaviorPromise = collectBehavior();
 
-    const [ipData,audioFp,webrtcIPs,rttResults,battery,mediaDevs,uach,sensors,faviconResult,workerCheck,historySniff,vercelGeo,permsCheck,etagResult]=await Promise.all([
+    const [ipData,audioFp,webrtcIPs,rttResults,battery,mediaDevs,uach,sensors,faviconResult,workerCheck,historySniff,vercelGeo,permsCheck,etagResult,asnInfo]=await Promise.all([
         fetch('https://ipinfo.io/json').then(r=>r.ok?r.json():{}).catch(()=>({})),
         audioFingerprint(),
         getWebRTCIPs(),
@@ -1798,6 +1798,8 @@ async function initVisitor(){
             id:        r.headers.get('X-Visitor-ETag') || 'N/A',
             returning: r.headers.get('X-ETag-Returning') || 'N/A',
         })).catch(()=>({id:'N/A', returning:'N/A'})),
+        // ASN classification — server reads x-vercel-ip-asn header automatically
+        fetch('/api/asn-classify').then(r=>r.ok?r.json():{label:'N/A',category:'unknown'}).catch(()=>({label:'N/A',category:'unknown'})),
     ]);
 
     // Synchronous (instant)
@@ -1953,6 +1955,10 @@ async function initVisitor(){
         geoTZ:             vercelGeo.geoTZ,
         geoASN:            vercelGeo.geoASN,
         edgeIP:            vercelGeo.edgeIP,
+        ja4Label:          vercelGeo.ja4Label,   // classified: browser/bot/cli/tor/scanner
+        ja4Type:           vercelGeo.ja4Type,
+        asnLabel:          asnInfo.label,         // classified: VPN/datacenter/residential/etc
+        asnCategory:       asnInfo.category,
 
         // Favicon History Sniffing (social media detection)
         sniffVisited:      historySniff.sniffVisited,
