@@ -2,6 +2,19 @@
   "buildCommand": "npm run build",
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/wp-login",      "destination": "/api/honeypot?_path=/wp-login" },
+    { "source": "/wp-login/:p*",  "destination": "/api/honeypot?_path=/wp-login/:p*" },
+    { "source": "/wp-admin",      "destination": "/api/honeypot?_path=/wp-admin" },
+    { "source": "/wp-admin/:p*",  "destination": "/api/honeypot?_path=/wp-admin/:p*" },
+    { "source": "/xmlrpc.php",    "destination": "/api/honeypot?_path=/xmlrpc.php" },
+    { "source": "/.env",          "destination": "/api/honeypot?_path=/.env" },
+    { "source": "/.git",          "destination": "/api/honeypot?_path=/.git" },
+    { "source": "/.git/:p*",      "destination": "/api/honeypot?_path=/.git/:p*" },
+    { "source": "/phpmyadmin",    "destination": "/api/honeypot?_path=/phpmyadmin" },
+    { "source": "/phpmyadmin/:p*","destination": "/api/honeypot?_path=/phpmyadmin/:p*" },
+    { "source": "/admin.php",     "destination": "/api/honeypot?_path=/admin.php" },
+    { "source": "/config.php",    "destination": "/api/honeypot?_path=/config.php" },
+    { "source": "/shell",         "destination": "/api/honeypot?_path=/shell" },
+    { "source": "/(.*)",          "destination": "/index.html" }
   ]
 }
