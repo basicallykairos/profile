@@ -2445,23 +2445,50 @@ initVisitor();
       const ctx  = new (window.AudioContext || window.webkitAudioContext)();
       const src  = ctx.createMediaElementSource(aud);
       analyser   = ctx.createAnalyser();
-      analyser.fftSize = 128;
+      analyser.fftSize = 2048;           // higher resolution — 1024 bins
+      analyser.smoothingTimeConstant = 0.75; // gentle smoothing, not laggy
       src.connect(analyser);
       analyser.connect(ctx.destination);
-      dataArr = new Uint8Array(analyser.frequencyBinCount);
+      dataArr = new Uint8Array(analyser.frequencyBinCount); // 1024
     } catch(_) {}
   }
+
+  // ── Logarithmic frequency → bar mapping ──
+  // Maps 1024 FFT bins across VN bars on a log scale (20Hz–18kHz),
+  // so bass/mids/highs each get roughly equal visual space.
+  function buildLogMap(binCount, barCount, sampleRate) {
+    const nyquist = sampleRate / 2;
+    const fMin = 40, fMax = 18000;
+    const map = [];
+    for (let i = 0; i < barCount; i++) {
+      const fLow  = fMin * Math.pow(fMax / fMin,  i      / barCount);
+      const fHigh = fMin * Math.pow(fMax / fMin, (i + 1) / barCount);
+      const bLow  = Math.floor(fLow  / nyquist * binCount);
+      const bHigh = Math.ceil (fHigh / nyquist * binCount);
+      map.push([Math.max(0, bLow), Math.min(binCount - 1, bHigh)]);
+    }
+    return map;
+  }
+  let logMap = null;
+  const smoothed = new Float32Array(VN).fill(0);
 
   // Animate bars — uses analyser data when playing, graceful idle animation otherwise
   let idlePhase = 0;
   function animateBars() {
     rafId = requestAnimationFrame(animateBars);
     if (analyser && dataArr && !aud.paused) {
+      // Build log map once we know sampleRate
+      if (!logMap) logMap = buildLogMap(dataArr.length, VN, analyser.context.sampleRate);
       analyser.getByteFrequencyData(dataArr);
-      const step = Math.floor(dataArr.length / VN);
       vizBars.forEach((b, i) => {
-        const v = dataArr[i * step] / 255;
-        b.style.height = Math.max(4, v * 100) + '%';
+        const [lo, hi] = logMap[i];
+        // Take max in the bin range (more responsive than average)
+        let peak = 0;
+        for (let k = lo; k <= hi; k++) peak = Math.max(peak, dataArr[k]);
+        const target = peak / 255;
+        // Smooth: rise fast, fall slow
+        smoothed[i] += (target > smoothed[i] ? 0.4 : 0.12) * (target - smoothed[i]);
+        b.style.height = Math.max(3, smoothed[i] * 96) + '%';
       });
     } else {
       // Idle: gentle sine wave
