@@ -195,7 +195,7 @@ module.exports = async function(req, res) {
             const isAudioZero     = d.audioEnv === 'virtual/headless (latency=0)' && !isFirefox;
             const isHeadless      = d.permsHeadless === 'YES' || d.liesSuspected === 'YES'
                                  || isSwiftShader || isScreenshotBot || isAudioZero;
-            const isVM         = !isHeadless && ((d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual'));
+            const isVM         = !isHeadless && !isFirefox && ((d.audioEnv||'').includes('VM') || (d.audioEnv||'').includes('virtual'));
             const hasVPN       = d.vpnLikely === 'YES' || d.tzDivergence === 'YES';
             const rtcLeaked    = d.rtcLeak === 'YES';
             const privExtension= d.canvasExtension === 'YES';
