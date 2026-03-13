@@ -11,10 +11,8 @@ const JA4_SIGNATURES = {
     // ── Browsers ──
     't13d1516h2_8daaf6152771': { label: 'Chrome 120+',         type: 'browser' },
     't13d1517h2_8daaf6152771': { label: 'Chrome/Chromium',     type: 'browser' },
-    't13d1516h2_5b57614c22b0': { label: 'Firefox 120+',                    type: 'browser' },
-    't13d1717h2_5b57614c22b0': { label: 'Firefox 120+ (SNI)',              type: 'browser' },
-    't13d1715h2_5b57614c22b0': { label: 'Firefox (Private/ETP Strict)',    type: 'browser' },
-    't13d1516h2_5b57614c22b1': { label: 'Firefox (Private)',               type: 'browser' },
+    't13d1516h2_5b57614c22b0': { label: 'Firefox 120+',        type: 'browser' },
+    't13d1717h2_5b57614c22b0': { label: 'Firefox 120+ (SNI)',  type: 'browser' },
     't13d1516h2_b32309a7f351': { label: 'Safari 17',           type: 'browser' },
     't13d1517h2_b32309a7f351': { label: 'Safari/WebKit',       type: 'browser' },
     't13d1516h2_3b5074b1b51d': { label: 'Edge (Chromium)',     type: 'browser' },

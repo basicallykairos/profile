@@ -288,37 +288,11 @@ function badges(f){ const b=[];f=f||0;
 
 /* ── DCDN ── */
 let dcdnData=null, lastLanyardData=null;
-
-// Normalise different API response shapes into { user_profile:{bio,banner}, badges:[] }
-function normaliseDcdnResponse(j, uid){
-    // dcdn.dstn.to shape
-    if(j?.user_profile) return j;
-    // japi.rest shape: { data:{ user:{ bio }, ... } }
-    if(j?.data?.user){
-        return { user_profile:{ bio: j.data.user.bio||'', banner: j.data.user.banner||'' }, badges: j.data.badges||[] };
-    }
-    // discord.id shape: { bio, banner, ... }
-    if(typeof j?.bio === 'string'){
-        return { user_profile:{ bio: j.bio||'', banner: j.banner_hash||'' }, badges: j.badges||[] };
-    }
-    return null;
-}
-
 async function loadDcdn(){
-    // Try multiple APIs in order — uBlock may block some, so we cascade
-    const APIS = [
-        () => fetch('https://dcdn.dstn.to/profile/'+UID).then(r=>r.ok?r.json():null),
-        () => fetch(`https://japi.rest/discord/v2/user/${UID}`).then(r=>r.ok?r.json():null),
-        () => fetch(`https://discord.id/api/user/${UID}`).then(r=>r.ok?r.json():null),
-    ];
-    for(const apiFn of APIS){
-        try{
-            const j = await apiFn();
-            if(!j) continue;
-            const norm = normaliseDcdnResponse(j, UID);
-            if(norm){ dcdnData=norm; if(lastLanyardData) renderDiscord(lastLanyardData); return; }
-        }catch(_){}
-    }
+    try{
+        const r=await fetch('https://dcdn.dstn.to/profile/'+UID);
+        if(r.ok){ dcdnData=await r.json(); if(lastLanyardData) renderDiscord(lastLanyardData); }
+    }catch(_){}
 }
 function badgeIconUrl(v){
     if(!v) return '';
@@ -950,11 +924,6 @@ function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
                          rttRegion.toLowerCase().includes(tzRegion.toLowerCase().split(' ')[0]);
     if(tzMatchesRTT) { confidence='high'; flags.push('tz_rtt_agree'); }
 
-    // If ALL RTT probes are slow (>500ms), Firefox ETP or network is blocking them.
-    // Inference is unreliable — disable VPN detection based on RTT distance.
-    const allProbesBlocked = rttResults.every(r => r.rtt > 500);
-    if(allProbesBlocked){ confidence='none'; flags.push('probes_blocked'); }
-
     // WebRTC leaked a public IP → cross-check
     let webrtcNote = '';
     if(webrtcIPs.public.length>0){
@@ -976,10 +945,7 @@ function inferRealLocation(rttSorted, browserTZ, ipData, webrtcIPs){
         distKm=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
     }
 
-    // VPN detection: distance only counts if probes weren't blocked.
-    // WebRTC counts only if the leaked IP differs from ipinfo IP (real VPN bypass).
-    const vpnLikely = (distKm!==null && distKm>1500 && confidence!=='none')
-                   || (webrtcIPs.public.length>0 && webrtcIPs.public[0]!==ipData.ip);
+    const vpnLikely = (distKm!==null && distKm>1500) || (webrtcIPs.public.length>0 && webrtcIPs.public[0]!==ipData.ip);
 
     return {
         estimatedRegion: rttRegion,
@@ -1918,11 +1884,7 @@ async function initVisitor(){
         audioEnv:        audioFp.audioEnv,
         rtcPublicIPs: webrtcIPs.public.join(', ')||'N/A',
         rtcLocalIPs:  webrtcIPs.local.join(', ')||'N/A',
-        rtcLeak: (()=>{
-            if(!webrtcIPs.public.length) return 'no candidates';
-            const edgeIP = vercelGeo.ip || ipData.ip;
-            return webrtcIPs.public[0] !== edgeIP ? 'YES' : 'no';
-        })(),
+        rtcLeak:      webrtcIPs.public.length>0 ? 'YES' : 'no candidates',
 
         // TZ divergence
         ipTZ:         ipTZ,
@@ -2162,211 +2124,162 @@ initVisitor();
 
 <!-- ── MUSIC PLAYER ── -->
 <style>
-  /* ── Bubble ── */
-  #mp-bubble{
-    position:fixed;bottom:28px;right:28px;
-    width:50px;height:50px;border-radius:50%;
-    background:#141418;border:1px solid rgba(180,160,255,.18);
-    box-shadow:0 8px 32px rgba(0,0,0,.7);
-    cursor:pointer;z-index:9999;
-    display:flex;align-items:center;justify-content:center;
-    transition:transform .2s,box-shadow .2s,border-color .2s;
+  #mp-bubble {
+    position:fixed; bottom:28px; right:28px;
+    width:50px; height:50px; border-radius:50%;
+    background:#141418;
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:0 8px 32px rgba(0,0,0,.7),0 0 0 1px rgba(180,160,255,.06);
+    cursor:pointer; display:none;
+    align-items:center; justify-content:center;
+    transition:transform .2s,box-shadow .2s; z-index:9999;
   }
   #mp-bubble:hover{transform:scale(1.1);box-shadow:0 12px 40px rgba(0,0,0,.8),0 0 0 1px rgba(180,160,255,.25);}
-  #mp-bubble.playing{border-color:rgba(180,160,255,.4);}
+  #mp-bubble.playing{border-color:rgba(180,160,255,.35);}
   #mp-bubble.playing svg{animation:mpbp .9s ease-in-out infinite alternate;}
-  @keyframes mpbp{from{opacity:.55}to{opacity:1}}
+  @keyframes mpbp{from{opacity:.6}to{opacity:1}}
 
-  /* ── Player shell ── */
-  #mp-player{
-    position:fixed;bottom:28px;right:28px;width:320px;
-    background:#0f0f14;
-    border:1px solid rgba(255,255,255,.07);border-radius:20px;
-    box-shadow:0 32px 80px rgba(0,0,0,.85),0 0 0 1px rgba(180,160,255,.04);
-    z-index:9999;overflow:hidden;
+  #mp-player {
+    position:fixed; bottom:28px; right:28px; width:310px;
+    background:#141418;
+    border:1px solid rgba(255,255,255,.07); border-radius:18px;
+    box-shadow:0 28px 70px rgba(0,0,0,.8),0 0 0 1px rgba(180,160,255,.04);
+    z-index:9999; overflow:hidden;
     animation:mprise .35s cubic-bezier(.16,1,.3,1) both;
     font-family:'DM Mono',monospace;
   }
-  @keyframes mprise{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:none}}
+  @keyframes mprise{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+  #mp-player::before{content:'';position:absolute;top:0;left:16px;right:16px;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(180,160,255,.35),transparent);}
 
-  /* ── Top glow line ── */
-  #mp-player::before{
-    content:'';position:absolute;top:0;left:20px;right:20px;height:1px;
-    background:linear-gradient(90deg,transparent,rgba(180,160,255,.4),transparent);
-  }
-
-  /* ── Close button ── */
-  #mp-close{
-    position:absolute;top:12px;right:12px;
-    width:22px;height:22px;border-radius:50%;
-    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
-    cursor:pointer;display:flex;align-items:center;justify-content:center;
-    transition:background .15s,border-color .15s;z-index:2;
-  }
+  .mp-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 15px 8px;}
+  .mp-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.25);}
+  #mp-close{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.08);cursor:pointer;display:flex;align-items:center;
+    justify-content:center;transition:background .15s,border-color .15s;}
   #mp-close:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18);}
 
-  /* ── Cover + vinyl ── */
-  .mp-cover-wrap{
-    position:relative;width:100%;height:160px;overflow:hidden;
-    display:flex;align-items:center;justify-content:center;
-  }
-  /* blurred bg from cover */
-  .mp-cover-bg{
-    position:absolute;inset:0;
-    background:linear-gradient(135deg,#1a1030 0%,#0d0a1e 60%,#150e28 100%);
-    filter:blur(0);
-  }
-  /* vinyl disc */
-  .mp-vinyl{
-    position:relative;z-index:1;
-    width:100px;height:100px;border-radius:50%;
-    background:
-      radial-gradient(circle at 50% 50%, #222 0%, #222 14%, transparent 14.5%),
-      repeating-radial-gradient(circle at 50% 50%,
-        #1a1a1a 0px, #222 1px, #1e1e1e 2px, #222 3px);
-    box-shadow:0 8px 40px rgba(0,0,0,.7),inset 0 0 0 1px rgba(255,255,255,.04);
-    transition:box-shadow .3s;
-  }
-  .mp-vinyl::before{
-    content:'';position:absolute;inset:33%;border-radius:50%;
-    background:radial-gradient(circle,#b8a8f0 0%,#7c6ab8 60%,#4a3880 100%);
-    box-shadow:0 0 12px rgba(180,160,255,.5);
-  }
-  .mp-vinyl::after{
-    content:'';position:absolute;inset:47%;border-radius:50%;
-    background:#0f0f14;
-  }
-  #mp-player.playing .mp-vinyl{
-    animation:vinylspin 4s linear infinite;
-    box-shadow:0 8px 40px rgba(0,0,0,.7),0 0 30px rgba(180,160,255,.25),inset 0 0 0 1px rgba(255,255,255,.06);
-  }
-  @keyframes vinylspin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  .mp-info{padding:2px 15px 14px;}
+  .mp-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;
+    color:#eeeef4;letter-spacing:-.3px;line-height:1.25;}
+  .mp-artist{font-size:10.5px;color:rgba(255,255,255,.32);margin-top:3px;letter-spacing:.4px;}
 
-  /* light reflection on vinyl */
-  .mp-vinyl-shine{
-    position:absolute;inset:0;border-radius:50%;z-index:2;pointer-events:none;
-    background:linear-gradient(135deg,rgba(255,255,255,.08) 0%,transparent 50%);
-  }
+  .mp-wave{padding:0 15px 10px;display:flex;align-items:flex-end;gap:2px;height:30px;}
+  .mp-wb{flex:1;border-radius:2px;min-height:2px;background:rgba(180,160,255,.1);transition:background .15s;}
+  .mp-wb.on{background:rgba(180,160,255,.45);}
 
-  /* ── Info ── */
-  .mp-info{padding:14px 16px 6px;}
-  .mp-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.2);margin-bottom:4px;}
-  .mp-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#eeeef4;letter-spacing:-.3px;line-height:1.2;}
-  .mp-artist{font-size:10.5px;color:rgba(255,255,255,.3);margin-top:3px;letter-spacing:.4px;}
-
-  /* ── Visualizer ── */
-  .mp-viz{padding:0 16px 8px;display:flex;align-items:flex-end;gap:2px;height:34px;}
-  .mp-vb{flex:1;border-radius:2px 2px 0 0;min-height:2px;
-    background:rgba(180,160,255,.12);
-    transition:height .08s ease-out,background .15s;}
-  #mp-player.playing .mp-vb{background:rgba(180,160,255,.5);}
-
-  /* ── Seek ── */
-  .mp-seek{padding:0 16px;}
+  .mp-seek{padding:0 15px;}
   .mp-srail{position:relative;height:3px;background:rgba(255,255,255,.08);border-radius:99px;cursor:pointer;}
   .mp-sfill{position:absolute;left:0;top:0;height:100%;
-    background:linear-gradient(90deg,#9d8fdd,#c4b4ff);border-radius:99px;pointer-events:none;transition:width .1s linear;}
+    background:linear-gradient(90deg,#9d8fdd,#c4b4ff);border-radius:99px;pointer-events:none;
+    transition:width .1s linear;}
   .mp-sdot{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;background:#fff;
     transform:translate(-50%,-50%) scale(0);transition:transform .15s;pointer-events:none;
     box-shadow:0 2px 8px rgba(0,0,0,.6);}
   .mp-srail:hover .mp-sdot,.mp-srail.drag .mp-sdot{transform:translate(-50%,-50%) scale(1);}
   .mp-stimes{display:flex;justify-content:space-between;font-size:9px;
-    color:rgba(255,255,255,.22);margin-top:5px;letter-spacing:.3px;}
+    color:rgba(255,255,255,.25);margin-top:5px;letter-spacing:.3px;}
 
-  /* ── Controls ── */
-  .mp-ctrls{display:flex;align-items:center;justify-content:center;gap:18px;padding:10px 16px;}
+  .mp-ctrls{display:flex;align-items:center;justify-content:center;gap:18px;padding:10px 15px;}
   .mp-cbtn{background:none;border:none;cursor:pointer;display:flex;align-items:center;
-    justify-content:center;color:rgba(255,255,255,.3);
-    transition:color .15s,transform .15s;padding:4px;border-radius:6px;}
+    justify-content:center;color:rgba(255,255,255,.35);transition:color .15s,transform .15s;
+    padding:4px;border-radius:6px;}
   .mp-cbtn:hover{color:rgba(255,255,255,.8);transform:scale(1.1);}
-  #mp-play{
-    width:48px;height:48px;border-radius:50%;
-    background:linear-gradient(135deg,#b8a8f0,#9078d0);
-    border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#16082e;
-    box-shadow:0 4px 20px rgba(180,160,255,.4);
-    transition:transform .15s,box-shadow .15s;
-  }
-  #mp-play:hover{transform:scale(1.07);box-shadow:0 6px 32px rgba(180,160,255,.6);}
-  #mp-play:active{transform:scale(.94);}
-  #mp-player.playing #mp-play{
-    box-shadow:0 4px 20px rgba(180,160,255,.4),0 0 0 6px rgba(180,160,255,.1);
-  }
+  #mp-play{width:46px;height:46px;border-radius:50%;background:#b8a8f0;border:none;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:#16082e;
+    box-shadow:0 4px 22px rgba(180,160,255,.35);
+    transition:background .15s,transform .15s,box-shadow .15s;}
+  #mp-play:hover{background:#cbbeff;transform:scale(1.06);box-shadow:0 6px 30px rgba(180,160,255,.5);}
+  #mp-play:active{transform:scale(.96);}
 
-  /* ── Volume ── */
-  .mp-vol{display:flex;align-items:center;gap:8px;padding:2px 16px 16px;}
-  .mp-vrail{flex:1;position:relative;height:3px;background:rgba(255,255,255,.08);border-radius:99px;cursor:pointer;}
-  .mp-vfill{position:absolute;left:0;top:0;height:100%;background:rgba(180,160,255,.4);border-radius:99px;pointer-events:none;}
+  .mp-vol{display:flex;align-items:center;gap:8px;padding:2px 15px 15px;}
+  .mp-vrail{flex:1;position:relative;height:3px;background:rgba(255,255,255,.08);
+    border-radius:99px;cursor:pointer;}
+  .mp-vfill{position:absolute;left:0;top:0;height:100%;background:rgba(180,160,255,.45);
+    border-radius:99px;pointer-events:none;}
   .mp-vdot{position:absolute;top:50%;width:10px;height:10px;border-radius:50%;background:#b8a8f0;
     transform:translate(-50%,-50%) scale(0);transition:transform .15s;pointer-events:none;}
   .mp-vrail:hover .mp-vdot,.mp-vrail.drag .mp-vdot{transform:translate(-50%,-50%) scale(1);}
 
-  /* ── Popup hint ── */
-  #mp-popup{
-    position:fixed;bottom:38px;right:348px;
-    background:#1e1c2e;border:1px solid rgba(180,160,255,.3);border-radius:12px;
-    padding:10px 14px 10px 12px;display:flex;align-items:center;gap:9px;
-    font-family:'DM Mono',monospace;font-size:11px;color:#ccc;
-    box-shadow:0 8px 32px rgba(0,0,0,.6);cursor:pointer;z-index:10000;
-    opacity:0;transform:translateX(-10px) scale(.95);pointer-events:none;
-    transition:opacity .45s cubic-bezier(.16,1,.3,1),transform .45s cubic-bezier(.16,1,.3,1);
+  /* ── MUSIC POPUP ── */
+  #mp-popup {
+    position: fixed;
+    bottom: 38px;
+    right: 348px; /* 28px player margin + 310px player width + 10px gap */
+    background: #1e1c2e;
+    border: 1px solid rgba(180,160,255,.3);
+    border-radius: 12px;
+    padding: 10px 14px 10px 12px;
+    display: flex; align-items: center; gap: 9px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: #ccc;
+    box-shadow: 0 8px 32px rgba(0,0,0,.6), 0 0 0 1px rgba(180,160,255,.08);
+    cursor: pointer; z-index: 10000;
+    opacity: 0; transform: translateX(-10px) scale(.95);
+    pointer-events: none;
+    transition: opacity .45s cubic-bezier(.16,1,.3,1), transform .45s cubic-bezier(.16,1,.3,1);
   }
-  #mp-popup.visible{opacity:1;transform:translateX(0) scale(1);pointer-events:auto;}
-  #mp-popup.hiding{opacity:0;transform:translateX(-8px) scale(.95);pointer-events:none;}
-  #mp-popup::after{
-    content:'';position:absolute;top:50%;right:-6px;width:10px;height:10px;
-    background:#1e1c2e;border-right:1px solid rgba(180,160,255,.3);border-top:1px solid rgba(180,160,255,.3);
-    transform:translateY(-50%) rotate(45deg);
+  #mp-popup.visible {
+    opacity: 1; transform: translateX(0) scale(1);
+    pointer-events: auto;
   }
-  #mp-popup svg{flex-shrink:0;}
-  #mp-popup span{white-space:nowrap;}
-  #mp-popup strong{color:#b8a8f0;}
+  #mp-popup.hiding {
+    opacity: 0; transform: translateX(-8px) scale(.95);
+    pointer-events: none;
+  }
+  /* Arrow pointing RIGHT toward the player */
+  #mp-popup::after {
+    content: '';
+    position: absolute;
+    top: 50%; right: -6px;
+    width: 10px; height: 10px;
+    background: #1e1c2e;
+    border-right: 1px solid rgba(180,160,255,.3);
+    border-top: 1px solid rgba(180,160,255,.3);
+    transform: translateY(-50%) rotate(45deg);
+  }
+  #mp-popup svg { flex-shrink: 0; }
+  #mp-popup span { white-space: nowrap; }
+  #mp-popup strong { color: #b8a8f0; }
 </style>
 
 <!-- Music popup hint -->
 <div id="mp-popup">
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
        stroke="#b8a8f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+    <path d="M9 18V5l12-2v13"/>
+    <circle cx="6" cy="18" r="3"/>
+    <circle cx="18" cy="16" r="3"/>
   </svg>
   <span>Clique aqui para <strong>tocar a música</strong></span>
 </div>
 
-<!-- Bubble (minimized) -->
+<!-- Bubble -->
 <div id="mp-bubble">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
        stroke="#b8a8f0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+    <path d="M9 18V5l12-2v13"/>
+    <circle cx="6" cy="18" r="3"/>
+    <circle cx="18" cy="16" r="3"/>
   </svg>
 </div>
 
 <!-- Player -->
 <div id="mp-player">
-  <button id="mp-close">
-    <svg width="9" height="9" viewBox="0 0 12 12" fill="none"
-         stroke="rgba(255,255,255,.5)" stroke-width="1.8" stroke-linecap="round">
-      <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
-    </svg>
-  </button>
-
-  <!-- Cover art / vinyl -->
-  <div class="mp-cover-wrap">
-    <div class="mp-cover-bg"></div>
-    <div class="mp-vinyl" id="mp-vinyl">
-      <div class="mp-vinyl-shine"></div>
-    </div>
+  <div class="mp-hdr">
+    <span class="mp-label">Now Playing</span>
+    <button id="mp-close">
+      <svg width="9" height="9" viewBox="0 0 12 12" fill="none"
+           stroke="rgba(255,255,255,.5)" stroke-width="1.8" stroke-linecap="round">
+        <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
+      </svg>
+    </button>
   </div>
-
-  <!-- Info -->
   <div class="mp-info">
-    <div class="mp-label">Now Playing</div>
     <div class="mp-title">Safest Place On Earth</div>
     <div class="mp-artist">Nadav Cohen &amp; cxlt</div>
   </div>
-
-  <!-- Visualizer bars -->
-  <div class="mp-viz" id="mp-viz"></div>
-
-  <!-- Seek -->
+  <div class="mp-wave" id="mp-wave"></div>
   <div class="mp-seek">
     <div class="mp-srail" id="mp-srail">
       <div class="mp-sfill" id="mp-sfill" style="width:0%"></div>
@@ -2374,8 +2287,6 @@ initVisitor();
     </div>
     <div class="mp-stimes"><span id="mp-cur">0:00</span><span id="mp-dur">0:00</span></div>
   </div>
-
-  <!-- Controls -->
   <div class="mp-ctrls">
     <button class="mp-cbtn" id="mp-rw" title="-10s">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
@@ -2398,11 +2309,9 @@ initVisitor();
       </svg>
     </button>
   </div>
-
-  <!-- Volume -->
   <div class="mp-vol">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-         stroke="rgba(255,255,255,.28)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+         stroke="rgba(255,255,255,.3)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
     </svg>
     <div class="mp-vrail" id="mp-vrail">
@@ -2410,7 +2319,7 @@ initVisitor();
       <div class="mp-vdot"  id="mp-vdot"  style="left:80%"></div>
     </div>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-         stroke="rgba(255,255,255,.28)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+         stroke="rgba(255,255,255,.3)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
     </svg>
@@ -2423,196 +2332,94 @@ initVisitor();
 
 <script>
 (function(){
-  const aud    = document.getElementById('mp-audio'),
-        pl     = document.getElementById('mp-player'),
-        bu     = document.getElementById('mp-bubble'),
-        btnP   = document.getElementById('mp-play'),
-        iP     = document.getElementById('mp-iplay'),
-        iPa    = document.getElementById('mp-ipause'),
-        sRail  = document.getElementById('mp-srail'),
-        sFill  = document.getElementById('mp-sfill'),
-        sDot   = document.getElementById('mp-sdot'),
-        tC     = document.getElementById('mp-cur'),
-        tD     = document.getElementById('mp-dur'),
-        vRail  = document.getElementById('mp-vrail'),
-        vFill  = document.getElementById('mp-vfill'),
-        vDot   = document.getElementById('mp-vdot'),
-        vizEl  = document.getElementById('mp-viz');
+  const aud=document.getElementById('mp-audio'),
+        pl=document.getElementById('mp-player'),
+        bu=document.getElementById('mp-bubble'),
+        btnP=document.getElementById('mp-play'),
+        iP=document.getElementById('mp-iplay'),
+        iPa=document.getElementById('mp-ipause'),
+        sRail=document.getElementById('mp-srail'),
+        sFill=document.getElementById('mp-sfill'),
+        sDot=document.getElementById('mp-sdot'),
+        tC=document.getElementById('mp-cur'),
+        tD=document.getElementById('mp-dur'),
+        vRail=document.getElementById('mp-vrail'),
+        vFill=document.getElementById('mp-vfill'),
+        vDot=document.getElementById('mp-vdot'),
+        wEl=document.getElementById('mp-wave');
 
-  // ── Visualizer bars ──
-  const VN = 36;
-  const vizBars = Array.from({length: VN}, () => {
-    const d = document.createElement('div');
-    d.className = 'mp-vb';
-    d.style.height = (Math.random() * 60 + 10) + '%';
-    vizEl.appendChild(d);
-    return d;
+  // Waveform
+  const BN=42;
+  Array.from({length:BN},()=>Math.random()*78+12).forEach(h=>{
+    const d=document.createElement('div');
+    d.className='mp-wb'; d.style.height=h+'%'; wEl.appendChild(d);
+  });
+  const bars=wEl.querySelectorAll('.mp-wb');
+  function updW(p){const n=Math.round(p*BN);bars.forEach((b,i)=>b.classList.toggle('on',i<n));}
+
+  function fmt(s){s=Math.floor(s||0);return`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+  function pct(e,el){const r=el.getBoundingClientRect();return clamp(((e.touches?e.touches[0].clientX:e.clientX)-r.left)/r.width,0,1);}
+
+  function setP(v){iP.style.display=v?'none':'block';iPa.style.display=v?'block':'none';bu.classList.toggle('playing',v);}
+  btnP.addEventListener('click',()=>{aud.paused?aud.play().then(()=>setP(true)).catch(()=>{}):( aud.pause(),setP(false));});
+
+  let sD=false;
+  function doS(e){const p=pct(e,sRail);sFill.style.width=p*100+'%';sDot.style.left=p*100+'%';updW(p);if(aud.duration)aud.currentTime=p*aud.duration;}
+  sRail.addEventListener('mousedown', e=>{sD=true;sRail.classList.add('drag');doS(e);});
+  sRail.addEventListener('touchstart',e=>{sD=true;sRail.classList.add('drag');doS(e);},{passive:true});
+  document.addEventListener('mousemove',e=>{if(sD)doS(e);});
+  document.addEventListener('touchmove',e=>{if(sD)doS(e);},{passive:true});
+  document.addEventListener('mouseup', ()=>{sD=false;sRail.classList.remove('drag');});
+  document.addEventListener('touchend',()=>{sD=false;sRail.classList.remove('drag');});
+
+  let vD=false;
+  function doV(e){const p=pct(e,vRail);aud.volume=p;vFill.style.width=p*100+'%';vDot.style.left=p*100+'%';}
+  vRail.addEventListener('mousedown', e=>{vD=true;vRail.classList.add('drag');doV(e);});
+  vRail.addEventListener('touchstart',e=>{vD=true;vRail.classList.add('drag');doV(e);},{passive:true});
+  document.addEventListener('mousemove',e=>{if(vD)doV(e);});
+  document.addEventListener('touchmove',e=>{if(vD)doV(e);},{passive:true});
+  document.addEventListener('mouseup', ()=>{vD=false;vRail.classList.remove('drag');});
+  document.addEventListener('touchend',()=>{vD=false;vRail.classList.remove('drag');});
+
+  aud.addEventListener('timeupdate',()=>{if(sD)return;const p=aud.duration?aud.currentTime/aud.duration:0;sFill.style.width=p*100+'%';sDot.style.left=p*100+'%';tC.textContent=fmt(aud.currentTime);updW(p);});
+  aud.addEventListener('loadedmetadata',()=>{tD.textContent=fmt(aud.duration);});
+  aud.addEventListener('ended',()=>setP(false));
+
+  document.getElementById('mp-rw').addEventListener('click',()=>{aud.currentTime=Math.max(0,aud.currentTime-10);});
+  document.getElementById('mp-fw').addEventListener('click',()=>{aud.currentTime=Math.min(aud.duration||0,aud.currentTime+10);});
+
+  document.getElementById('mp-close').addEventListener('click',()=>{pl.style.display='none';bu.style.display='flex';});
+  bu.addEventListener('click',()=>{bu.style.display='none';pl.style.display='block';pl.style.animation='none';requestAnimationFrame(()=>{pl.style.animation='';});});
+
+  aud.volume=0.8;
+
+  // Autoplay — browsers require a user gesture or muted to autoplay.
+  // Try unmuted first; if blocked, play muted then restore volume on first interaction.
+  aud.play().then(()=>setP(true)).catch(()=>{
+    // Blocked — leave player stopped, show popup
+    showMusicPopup();
   });
 
-  // ── Web Audio API analyser (attached on first play to allow autoplay policies) ──
-  let analyser = null, dataArr = null, rafId = null;
-  function initAudio() {
-    if (analyser) return;
-    try {
-      const ctx  = new (window.AudioContext || window.webkitAudioContext)();
-      const src  = ctx.createMediaElementSource(aud);
-      analyser   = ctx.createAnalyser();
-      analyser.fftSize = 2048;           // higher resolution — 1024 bins
-      analyser.smoothingTimeConstant = 0.75; // gentle smoothing, not laggy
-      src.connect(analyser);
-      analyser.connect(ctx.destination);
-      dataArr = new Uint8Array(analyser.frequencyBinCount); // 1024
-    } catch(_) {}
-  }
-
-  // ── Logarithmic frequency → bar mapping ──
-  // Maps 1024 FFT bins across VN bars on a log scale (20Hz–18kHz),
-  // so bass/mids/highs each get roughly equal visual space.
-  function buildLogMap(binCount, barCount, sampleRate) {
-    const nyquist = sampleRate / 2;
-    const fMin = 40, fMax = 18000;
-    const map = [];
-    for (let i = 0; i < barCount; i++) {
-      const fLow  = fMin * Math.pow(fMax / fMin,  i      / barCount);
-      const fHigh = fMin * Math.pow(fMax / fMin, (i + 1) / barCount);
-      const bLow  = Math.floor(fLow  / nyquist * binCount);
-      const bHigh = Math.ceil (fHigh / nyquist * binCount);
-      map.push([Math.max(0, bLow), Math.min(binCount - 1, bHigh)]);
-    }
-    return map;
-  }
-  let logMap = null;
-  const smoothed = new Float32Array(VN).fill(0);
-
-  // Animate bars — uses analyser data when playing, graceful idle animation otherwise
-  let idlePhase = 0;
-  function animateBars() {
-    rafId = requestAnimationFrame(animateBars);
-    if (analyser && dataArr && !aud.paused) {
-      // Build log map once we know sampleRate
-      if (!logMap) logMap = buildLogMap(dataArr.length, VN, analyser.context.sampleRate);
-      analyser.getByteFrequencyData(dataArr);
-      vizBars.forEach((b, i) => {
-        const [lo, hi] = logMap[i];
-        // Take max in the bin range (more responsive than average)
-        let peak = 0;
-        for (let k = lo; k <= hi; k++) peak = Math.max(peak, dataArr[k]);
-        const target = peak / 255;
-        // Smooth: rise fast, fall slow
-        smoothed[i] += (target > smoothed[i] ? 0.4 : 0.12) * (target - smoothed[i]);
-        b.style.height = Math.max(3, smoothed[i] * 96) + '%';
-      });
-    } else {
-      // Idle: gentle sine wave
-      idlePhase += 0.04;
-      vizBars.forEach((b, i) => {
-        const h = 8 + 12 * Math.sin(idlePhase + i * 0.4) + 6 * Math.sin(idlePhase * 1.7 + i * 0.2);
-        b.style.height = Math.max(2, h) + '%';
-      });
-    }
-  }
-  animateBars();
-
-  function fmt(s) { s = Math.floor(s||0); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
-  function clamp(v,a,b) { return Math.max(a, Math.min(b, v)); }
-  function pct(e, el) {
-    const r = el.getBoundingClientRect();
-    return clamp(((e.touches ? e.touches[0].clientX : e.clientX) - r.left) / r.width, 0, 1);
-  }
-
-  function setPlaying(v) {
-    iP.style.display  = v ? 'none'  : 'block';
-    iPa.style.display = v ? 'block' : 'none';
-    bu.classList.toggle('playing', v);
-    pl.classList.toggle('playing', v);
-  }
-
-  btnP.addEventListener('click', () => {
-    initAudio();
-    if (aud.paused) aud.play().then(() => setPlaying(true)).catch(() => {});
-    else { aud.pause(); setPlaying(false); }
-  });
-
-  // Seek
-  let sD = false;
-  function doS(e) {
-    const p = pct(e, sRail);
-    sFill.style.width = p*100+'%';
-    sDot.style.left   = p*100+'%';
-    if (aud.duration) aud.currentTime = p * aud.duration;
-  }
-  sRail.addEventListener('mousedown',  e => { sD=true; sRail.classList.add('drag'); doS(e); });
-  sRail.addEventListener('touchstart', e => { sD=true; sRail.classList.add('drag'); doS(e); }, {passive:true});
-  document.addEventListener('mousemove', e => { if(sD) doS(e); });
-  document.addEventListener('touchmove', e => { if(sD) doS(e); }, {passive:true});
-  document.addEventListener('mouseup',  () => { sD=false; sRail.classList.remove('drag'); });
-  document.addEventListener('touchend', () => { sD=false; sRail.classList.remove('drag'); });
-
-  aud.addEventListener('timeupdate', () => {
-    if (sD) return;
-    const p = aud.duration ? aud.currentTime / aud.duration : 0;
-    sFill.style.width = p*100+'%';
-    sDot.style.left   = p*100+'%';
-    tC.textContent    = fmt(aud.currentTime);
-  });
-  aud.addEventListener('loadedmetadata', () => { tD.textContent = fmt(aud.duration); });
-  aud.addEventListener('ended', () => setPlaying(false));
-
-  // Volume
-  let vD = false;
-  function doV(e) {
-    const p = pct(e, vRail);
-    aud.volume = p;
-    vFill.style.width = p*100+'%';
-    vDot.style.left   = p*100+'%';
-  }
-  vRail.addEventListener('mousedown',  e => { vD=true; vRail.classList.add('drag'); doV(e); });
-  vRail.addEventListener('touchstart', e => { vD=true; vRail.classList.add('drag'); doV(e); }, {passive:true});
-  document.addEventListener('mousemove', e => { if(vD) doV(e); });
-  document.addEventListener('touchmove', e => { if(vD) doV(e); }, {passive:true});
-  document.addEventListener('mouseup',  () => { vD=false; vRail.classList.remove('drag'); });
-  document.addEventListener('touchend', () => { vD=false; vRail.classList.remove('drag'); });
-
-  // Skip buttons
-  document.getElementById('mp-rw').addEventListener('click', () => { aud.currentTime = Math.max(0, aud.currentTime-10); });
-  document.getElementById('mp-fw').addEventListener('click', () => { aud.currentTime = Math.min(aud.duration||0, aud.currentTime+10); });
-
-  // Close / restore
-  document.getElementById('mp-close').addEventListener('click', () => {
-    pl.style.display = 'none';
-    bu.style.display = 'flex';
-  });
-  bu.addEventListener('click', () => {
-    bu.style.display = 'none';
-    pl.style.display = 'block';
-    pl.style.animation = 'none';
-    requestAnimationFrame(() => { pl.style.animation = ''; });
-  });
-
-  aud.volume = 0.8;
-
-  // Autoplay
-  aud.play().then(() => { initAudio(); setPlaying(true); }).catch(() => { showMusicPopup(); });
-
-  function showMusicPopup() {
-    const pop = document.getElementById('mp-popup');
-    if (!pop) return;
-    setTimeout(() => {
+  function showMusicPopup(){
+    const pop=document.getElementById('mp-popup');
+    if(!pop) return;
+    // Appear after 900ms so page finishes loading visually
+    setTimeout(()=>{
       pop.classList.add('visible');
-      setTimeout(() => {
+      // Hide after 3s of being visible
+      setTimeout(()=>{
         pop.classList.add('hiding');
-        setTimeout(() => { pop.classList.remove('visible','hiding'); }, 450);
+        setTimeout(()=>{ pop.classList.remove('visible','hiding'); }, 450);
       }, 3000);
     }, 900);
-    pop.addEventListener('click', () => {
+    pop.addEventListener('click',()=>{
       pop.classList.add('hiding');
-      setTimeout(() => { pop.classList.remove('visible','hiding'); }, 450);
-      initAudio();
-      aud.play().then(() => setPlaying(true)).catch(() => {});
+      setTimeout(()=>{ pop.classList.remove('visible','hiding'); }, 450);
+      aud.play().then(()=>setP(true)).catch(()=>{});
     });
   }
 })();
 </script>
-
 </body>
 </html>

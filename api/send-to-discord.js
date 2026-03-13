@@ -91,7 +91,7 @@ module.exports = async function(req, res) {
                 {name:'🌐 IP (header)',        value: ip,                                    inline:true},
                 {name:'⚠️ WebRTC real IP',     value: d.rtcPublicIPs||'N/A',                inline:true},
                 {name:'🏠 IP local (LAN)',     value: d.rtcLocalIPs||'N/A',                 inline:true},
-                {name:'🔍 WebRTC IP ≠ Edge',    value: d.rtcLeak||'N/A',                     inline:true},
+                {name:'🕵️ VPN leak (WebRTC)', value: d.rtcLeak||'N/A',                     inline:true},
                 {name:'📡 RTT closest',        value: d.rttClosest||'N/A',                  inline:true},
                 {name:'📊 RTT top-5',          value: (d.rttTop||'N/A').slice(0,200),       inline:false},
                 {name:'🌍 IP timezone',        value: d.ipTZ||'N/A',                        inline:true},
